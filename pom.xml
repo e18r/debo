@@ -15,5 +15,21 @@
       <version>3.8.1</version>
       <scope>test</scope>
     </dependency>
+				<dependency>
+						<groupId>org.rapidoid</groupId>
+						<artifactId>rapidoid-http-server</artifactId>
+						<version>5.5.5</version>
+				</dependency>
   </dependencies>
+		<build>
+				<plugins>
+						<plugin>
+								<artifactId>maven-compiler-plugin</artifactId>
+								<configuration>
+										<source>1.8</source>
+										<target>1.8</target>
+								</configuration>
+						</plugin>
+				</plugins>
+		</build>
 </project>
