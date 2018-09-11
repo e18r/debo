@@ -4,10 +4,7 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-/**
- * Unit test for simple App.
- */
-public class DeboTest 
+public class LogicTest 
     extends TestCase
 {
     /**
@@ -15,7 +12,7 @@ public class DeboTest
      *
      * @param testName name of the test case
      */
-    public DeboTest( String testName )
+    public LogicTest( String testName )
     {
         super( testName );
     }
@@ -25,13 +22,13 @@ public class DeboTest
      */
     public static Test suite()
     {
-        return new TestSuite( DeboTest.class );
+        return new TestSuite( LogicTest.class );
     }
 
     /**
      * Rigourous Test :-)
      */
-    public void testDebo()
+    public void testLogic()
     {
         assertTrue( true );
     }
