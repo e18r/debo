@@ -10,6 +10,10 @@ public class Logic {
 	model = new Model();
     }
 
+    public void postCurrencies(Model.Currency c) throws Exception {
+	model.postCurrencies(c);
+    }
+
     public ArrayList<Model.Currency> getCurrencies() {
 	return model.getCurrencies();
     }
@@ -21,8 +25,15 @@ public class Logic {
 	return model.getCurrency(code);
     }
 
-    public void postCurrencies(Model.Currency c) throws Exception {
-	model.postCurrencies(c);
+    public void patchCurrency(String code, Model.Currency c) throws Exception {
+	if(c.code == null && c.name == null && c.type == null) {
+	    throw new Exception("Please specify at least one field to patch");
+	}
+	model.patchCurrency(code, c);
+    }
+
+    public void deleteCurrency(String code) throws Exception {
+	model.deleteCurrency(code);
     }
 
     public ArrayList<Model.Account> getAccounts() {

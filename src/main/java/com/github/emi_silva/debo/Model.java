@@ -78,6 +78,30 @@ public class Model {
     }
 
     /**
+     * Finds a currency type id given its name
+     */
+    public int findCurrencyType(String type) throws Exception {
+	for(CurrencyType ct : getCurrencyTypes()) {
+	    if(ct.name.equals(type)) {
+		return ct.id;
+	    }
+	}
+	throw new Exception("type not found");
+    }
+
+    /**
+     * Creates a new currency
+     */
+    public void postCurrencies(Currency c) throws Exception, SQLException {
+	int type = findCurrencyType(c.type);
+	String query = "INSERT INTO currencies (code, name, type) "
+	    + "VALUES ('" + c.code + "', '" + c.name + "', " + type + ")";
+	Statement st = conn.createStatement();
+	st.executeUpdate(query);
+	st.close();
+    }
+
+    /**
      * Returns a list of currencies
      */
     public ArrayList<Currency> getCurrencies() {
@@ -134,27 +158,47 @@ public class Model {
     }
 
     /**
-     * Finds a currency type id given its name
+     * Updates a currency
      */
-    public int findCurrencyType(String type) throws Exception {
-	for(CurrencyType ct : getCurrencyTypes()) {
-	    if(ct.name.equals(type)) {
-		return ct.id;
+    public void patchCurrency(String code, Currency c) throws Exception,
+							    SQLException {
+	String query = "UPDATE currencies SET ";
+	if(c.code != null) {
+	    query += "code = '" + c.code + "'";
+	    if(c.name != null || c.type != null) {
+		query += ", ";
 	    }
 	}
-	throw new Exception("not found");
+	if(c.name != null) {
+	    query += "name = '" + c.name + "'";
+	    if(c.type != null) {
+		query += ", ";
+	    }
+	}
+	if(c.type != null) {
+	    int type = findCurrencyType(c.type);
+	    query += "type = " + type;
+	}
+	query += " WHERE code = '" + code + "'";
+	Statement st = conn.createStatement();
+	int rowsUpdated = st.executeUpdate(query);
+	st.close();
+	if(rowsUpdated == 0) {
+	    throw new Exception("code not found");
+	}
     }
 
     /**
-     * Creates a new currency
+     * Deletes a currency
      */
-    public void postCurrencies(Currency c) throws Exception, SQLException {
-	int type = findCurrencyType(c.type);
-	String query = "INSERT INTO currencies (code, name, type) "
-	    + "VALUES ('" + c.code + "', '" + c.name + "', '" + type + "')";
+    public void deleteCurrency(String code) throws Exception, SQLException {
+	String query = "DELETE FROM currencies WHERE code = '" + code + "'";
 	Statement st = conn.createStatement();
-	st.executeUpdate(query);
+	int rowsDeleted = st.executeUpdate(query);
 	st.close();
+	if(rowsDeleted == 0) {
+	    throw new Exception("code not found");
+	}
     }
 
     /**
