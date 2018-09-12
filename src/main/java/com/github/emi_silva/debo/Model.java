@@ -106,7 +106,8 @@ public class Model {
      */
     public ArrayList<Currency> getCurrencies() {
 	ArrayList<Currency> currencies = new ArrayList<Currency>();
-	String query = "SELECT code, currencies.name, currency_types.name "
+	String query = "SELECT currencies.id, code, currencies.name, "
+	    + "currency_types.name "
 	    + "FROM currencies "
 	    + "JOIN currency_types ON currencies.type = currency_types.id";
 	try {
@@ -114,9 +115,10 @@ public class Model {
 	    ResultSet rs = st.executeQuery(query);
 	    while(rs.next()) {
 		Currency c = new Currency();
-		c.code = rs.getString(1);
-		c.name = rs.getString(2);
-		c.type = rs.getString(3);
+		c.id = rs.getInt(1);
+		c.code = rs.getString(2);
+		c.name = rs.getString(3);
+		c.type = rs.getString(4);
 		currencies.add(c);
 	    }
 	    rs.close();
@@ -200,6 +202,13 @@ public class Model {
 	    throw new Exception("code not found");
 	}
     }
+    
+    /**
+     * Creates an account
+     */
+    public void postAccounts(Account a) throws SQLException {
+	String query = "INSERT INTO accounts";
+    }
 
     /**
      * Returns a human readable list of accounts
@@ -239,6 +248,7 @@ public class Model {
     }
 
     public static class Currency {
+	public int id;
 	public String code;
 	public String name;
 	public String type;
@@ -249,6 +259,7 @@ public class Model {
     }
 
     public static class Account {
+	public int id;
 	public String type;
 	public String name;
 	public String currency;

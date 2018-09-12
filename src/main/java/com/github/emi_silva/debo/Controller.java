@@ -39,7 +39,16 @@ public class Controller {
 		    return req.response().result(e.getMessage()).code(400);
 		}
 	    });
-	
+
+	On.post("/accounts").json((Model.Account a, Req req) -> {
+		try {
+		    logic.postAccounts(a);
+		    return req.response().result("").code(201);
+		}
+		catch(Exception e) {
+		    return req.response().result(e.getMessage()).code(400);
+		}
+	    });
 	On.get("/accounts").json(() -> U.list(logic.getAccounts()));
     }
 }

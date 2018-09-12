@@ -36,6 +36,10 @@ public class Logic {
 	model.deleteCurrency(code);
     }
 
+    public void postAccounts(Model.Account a) throws Exception {
+	model.postAccounts(a);
+    }
+
     public ArrayList<Model.Account> getAccounts() {
 	return model.getAccounts();
     }
