@@ -58,7 +58,7 @@ public class Model {
      */
     public ArrayList<CurrencyType> getCurrencyTypes() {
 	ArrayList<CurrencyType> cts = new ArrayList<CurrencyType>();
-	String query = "SELECT * FROM currency_types";
+	String query = "SELECT id, name FROM currency_types";
 	try {
 	    Statement st = conn.createStatement();
 	    ResultSet rs = st.executeQuery(query);
@@ -78,6 +78,30 @@ public class Model {
     }
 
     /**
+     * Returns a list of account types
+     */
+    public ArrayList<AccountType> getAccountTypes() {
+	ArrayList<AccountType> ats = new ArrayList<AccountType>();
+	String query = "SELECT id, name FROM account_types";
+	try {
+	    Statement st = conn.createStatement();
+	    ResultSet rs = st.executeQuery(query);
+	    while(rs.next()) {
+		AccountType at = new AccountType();
+		at.id = rs.getInt(1);
+		at.name = rs.getString(2);
+		ats.add(at);
+	    }
+	    rs.close();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    System.out.println(e);
+	}
+	return ats;
+    }
+
+    /**
      * Finds a currency type id given its name
      */
     public int findCurrencyType(String type) throws Exception {
@@ -86,30 +110,72 @@ public class Model {
 		return ct.id;
 	    }
 	}
-	throw new Exception("type not found");
+	throw new Exception("Currency type not found.");
     }
 
     /**
-     * Creates a new currency
+     * Finds a currency id given its code
+     */
+    public int findCurrencyId(String code) throws Exception {
+	ArrayList<Currency> currencies = getCurrencies(new Currency());
+	for(Currency c : currencies) {
+	    if(c.code.equals(code)) {
+		return c.id;
+	    }
+	}
+	throw new Exception("Currency code not found.");
+    }
+
+    /**
+     * Finds an account type id given its name
+     */
+    public int findAccountTypeId(String type) throws Exception {
+	ArrayList<AccountType> ats = getAccountTypes();
+	for(AccountType at : ats) {
+	    if(at.name.equals(type)) {
+		return at.id;
+	    }
+	}
+	throw new Exception("Account type not found.");
+    }
+
+    /**
+     * Creates a currency
      */
     public void postCurrencies(Currency c) throws Exception, SQLException {
 	int type = findCurrencyType(c.type);
 	String query = "INSERT INTO currencies (code, name, type) "
 	    + "VALUES ('" + c.code + "', '" + c.name + "', " + type + ")";
 	Statement st = conn.createStatement();
+	int rowsInserted = st.executeUpdate(query);
+	st.close();
+    }
+    
+    /**
+     * Creates an account
+     */
+    public void postAccounts(Account a) throws Exception, SQLException {
+	int currencyId = findCurrencyId(a.currency);
+	int typeId = findAccountTypeId(a.type);
+	String query = "INSERT INTO accounts (name, currency, type) "
+	    + "VALUES ('" + a.name + "', " + currencyId + ", " + typeId + ")";
+	Statement st = conn.createStatement();
 	st.executeUpdate(query);
 	st.close();
     }
 
     /**
-     * Returns a list of currencies
+     * Returns a (filtered) list of currencies
      */
-    public ArrayList<Currency> getCurrencies() {
+    public ArrayList<Currency> getCurrencies(Currency filter) {
 	ArrayList<Currency> currencies = new ArrayList<Currency>();
 	String query = "SELECT currencies.id, code, currencies.name, "
 	    + "currency_types.name "
 	    + "FROM currencies "
 	    + "JOIN currency_types ON currencies.type = currency_types.id";
+	if(filter.type != null) {
+	    query += " WHERE currency_types.name = '" + filter.type + "'";
+	}
 	try {
 	    Statement st = conn.createStatement();
 	    ResultSet rs = st.executeQuery(query);
@@ -131,11 +197,63 @@ public class Model {
     }
 
     /**
+     * Returns a (filtered) list of accounts
+     */
+    public ArrayList<Account> getAccounts(Account filter) {
+	ArrayList<Account> accounts = new ArrayList<Account>();
+	String query = "SELECT accounts.id, account_types.name, accounts.name, "
+	    + "currencies.code "
+	    + "FROM accounts "
+	    + "JOIN account_types ON accounts.type = account_types.id "
+	    + "JOIN currencies on accounts.currency = currencies.id";
+	boolean previousCondition = false;
+	if(filter.type != null || filter.name != null || filter.currency != null) {
+	    query += " WHERE ";
+	}
+	if(filter.type != null) {
+	    query += "account_types.name = '" + filter.type + "'";
+	    previousCondition = true;
+	}
+	if(filter.name != null) {
+	    if(previousCondition) {
+		query += " AND ";
+	    }
+	    query += "accounts.name = '" + filter.name + "'";
+	    previousCondition = true;
+	}
+	if(filter.currency != null) {
+	    if(previousCondition) {
+		query += " AND ";
+	    }
+	    query += "currencies.code = '" + filter.currency + "'";
+	}
+	try {
+	    Statement st = conn.createStatement();
+	    ResultSet rs = st.executeQuery(query);
+	    while(rs.next()) {
+		Account a = new Account();
+		a.id = rs.getInt(1);
+		a.type = rs.getString(2);
+		a.name = rs.getString(3);
+		a.currency = rs.getString(4);
+		accounts.add(a);
+	    }
+	    rs.close();
+	    st.close();
+	}
+	catch (SQLException e) {
+	    System.out.println(e);
+	}
+	return accounts;
+    }
+    
+    /**
      * Returns a single currency
      */
     public Currency getCurrency(String code) {
 	Currency c = new Currency();
-	String query = "SELECT code, currencies.name, currency_types.name "
+	String query = "SELECT currencies.id, code, currencies.name, "
+	    + "currency_types.name "
 	    + "FROM currencies "
 	    + "JOIN currency_types ON currencies.type = currency_types.id "
 	    + "WHERE code = '" + code + "'";
@@ -143,9 +261,10 @@ public class Model {
 	    Statement st = conn.createStatement();
 	    ResultSet rs = st.executeQuery(query);
 	    if(rs.next()) {
-		c.code = rs.getString(1);
-		c.name = rs.getString(2);
-		c.type = rs.getString(3);
+		c.id = rs.getInt(1);
+		c.code = rs.getString(2);
+		c.name = rs.getString(3);
+		c.type = rs.getString(4);
 	    }
 	    else {
 		c = null;
@@ -157,6 +276,38 @@ public class Model {
 	    System.out.println(e);
 	}
 	return c;
+    }
+
+    /**
+     * Returns a single account
+     */
+    public Account getAccount(int id) {
+	Account a = new Account();
+	String query = "SELECT accounts.id, account_types.name, accounts.name, "
+	    + "currencies.code "
+	    + "FROM accounts "
+	    + "JOIN account_types ON accounts.type = account_types.id "
+	    + "JOIN currencies ON accounts.currency = currencies.id "
+	    + "WHERE accounts.id = " + id;
+	try {
+	    Statement st = conn.createStatement();
+	    ResultSet rs = st.executeQuery(query);
+	    if(rs.next()) {
+		a.id = rs.getInt(1);
+		a.type = rs.getString(2);
+		a.name = rs.getString(3);
+		a.currency = rs.getString(4);
+	    }
+	    else {
+		a = null;
+	    }
+	    rs.close();
+	    st.close();
+	}
+	catch (SQLException e) {
+	    System.out.println(e);
+	}
+	return a;
     }
 
     /**
@@ -186,7 +337,7 @@ public class Model {
 	int rowsUpdated = st.executeUpdate(query);
 	st.close();
 	if(rowsUpdated == 0) {
-	    throw new Exception("code not found");
+	    throw new Exception("Currency code not found.");
 	}
     }
 
@@ -199,43 +350,8 @@ public class Model {
 	int rowsDeleted = st.executeUpdate(query);
 	st.close();
 	if(rowsDeleted == 0) {
-	    throw new Exception("code not found");
+	    throw new Exception("Currency code not found.");
 	}
-    }
-    
-    /**
-     * Creates an account
-     */
-    public void postAccounts(Account a) throws SQLException {
-	String query = "INSERT INTO accounts";
-    }
-
-    /**
-     * Returns a human readable list of accounts
-     */
-    public ArrayList<Account> getAccounts() {
-	ArrayList<Account> accounts = new ArrayList<Account>();
-	String query = "SELECT account_types.name, accounts.name, code "
-	    + "FROM accounts "
-	    + "JOIN account_types ON accounts.type = account_types.id "
-	    + "JOIN currencies on accounts.currency = currencies.id";
-	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
-	    while(rs.next()) {
-		Account a = new Account();
-		a.type = rs.getString(1);
-		a.name = rs.getString(2);
-		a.currency = rs.getString(3);
-		accounts.add(a);
-	    }
-	    rs.close();
-	    st.close();
-	}
-	catch (SQLException e) {
-	    System.out.println(e);
-	}
-	return accounts;
     }
 
     public static class CurrencyType {
@@ -255,6 +371,15 @@ public class Model {
 	Currency() {}
 	public String toString() {
 	    return code + ": " + name + " (" + type + ")";
+	}
+    }
+
+    public static class AccountType {
+	public int id;
+	public String name;
+	AccountType() {}
+	public String toString() {
+	    return name;
 	}
     }
 

@@ -47,12 +47,15 @@ public class ModelTest extends TestCase {
     /**
      * Checks currency types are returned correctly
      */
-    public void testGetCurrencyTypes() {
+    public void testGetCurrencyTypes() throws Exception {
 	model = new Model();
 	ArrayList<Model.CurrencyType> cts = model.getCurrencyTypes();
 	for(Model.CurrencyType ct : cts) {
-	    System.out.println(ct);
+	    if(ct.name.equals("fiat")) {
+		return;
+	    }
 	}
+	throw new Exception("fiat currency type not found");
     }
 
     /**
@@ -61,6 +64,37 @@ public class ModelTest extends TestCase {
     public void testFindCurrencyType() throws Exception {
 	model = new Model();
 	assertEquals(model.findCurrencyType("fiat"), 1);
+    }
+
+    /**
+     * Checks an id is found for an existing currency code
+     */
+    public void testFindCurrencyId() throws Exception {
+	model = new Model();
+	assertEquals(model.findCurrencyId("COP"), 5);
+    }
+
+    /**
+     * Checks account types are returned correctly
+     */
+    public void testGetAccountTypes() throws Exception {
+	model = new Model();
+	ArrayList<Model.AccountType> ats = model.getAccountTypes();
+	for(Model.AccountType at : ats) {
+	    if(at.name.equals("asset")) {
+		return;
+	    }
+	}
+	throw new Exception("asset account type not found");
+    }
+
+    /**
+     * Checks an account type id is found
+     */
+    public void testFindAccountTypeId() throws Exception {
+	model = new Model();
+	int id = model.findAccountTypeId("asset");
+	assertEquals(id, 1);
     }
 
 }

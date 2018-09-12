@@ -4,6 +4,8 @@ import java.util.ArrayList;
 
 public class Logic {
 
+    final int MAX_INT = 2147483647;
+
     private Model model;
 
     public Logic() {
@@ -13,9 +15,15 @@ public class Logic {
     public void postCurrencies(Model.Currency c) throws Exception {
 	model.postCurrencies(c);
     }
+    public void postAccounts(Model.Account a) throws Exception {
+	model.postAccounts(a);
+    }
 
-    public ArrayList<Model.Currency> getCurrencies() {
-	return model.getCurrencies();
+    public ArrayList<Model.Currency> getCurrencies(Model.Currency c) {
+	return model.getCurrencies(c);
+    }
+    public ArrayList<Model.Account> getAccounts(Model.Account a) {
+	return model.getAccounts(a);
     }
 
     public Model.Currency getCurrency(String code) {
@@ -23,6 +31,14 @@ public class Logic {
 	    return null;
 	}
 	return model.getCurrency(code);
+    }
+
+    public Model.Account getAccount(String idString) throws Exception {
+	int id = Integer.valueOf(idString);
+	if(id < 0 || id > MAX_INT) {
+	    return null;
+	}
+	return model.getAccount(id);
     }
 
     public void patchCurrency(String code, Model.Currency c) throws Exception {
@@ -34,13 +50,5 @@ public class Logic {
 
     public void deleteCurrency(String code) throws Exception {
 	model.deleteCurrency(code);
-    }
-
-    public void postAccounts(Model.Account a) throws Exception {
-	model.postAccounts(a);
-    }
-
-    public ArrayList<Model.Account> getAccounts() {
-	return model.getAccounts();
     }
 }
