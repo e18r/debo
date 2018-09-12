@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.sql.Statement;
 import java.sql.ResultSet;
 import java.lang.Exception;
+import java.math.BigDecimal;
 
 public class Model {
 
@@ -159,6 +160,32 @@ public class Model {
 	int typeId = findAccountTypeId(a.type);
 	String query = "INSERT INTO accounts (name, currency, type) "
 	    + "VALUES ('" + a.name + "', " + currencyId + ", " + typeId + ")";
+	Statement st = conn.createStatement();
+	st.executeUpdate(query);
+	st.close();
+    }
+
+    /**
+     * Creates a transaction
+     */
+    public void postTransactions(Transaction t) throws SQLException {
+	String query = "INSERT INTO transactions (";
+	if(t.date != null) {
+	    query += "date, ";
+	}
+	query += "amount, debit, credit";
+	if(t.comment != null) {
+	    query += ", comment";
+	}
+	query += ") VALUES (";
+	if(t.date != null) {
+	    query += "TIMESTAMP WITH TIME ZONE '" + t.date + "', ";
+	}
+	query += t.amount.toPlainString() + ", " + t.debit + ", " + t.credit;
+	if(t.comment != null) {
+	    query += ", '" + t.comment + "'";
+	}
+	query += ")";
 	Statement st = conn.createStatement();
 	st.executeUpdate(query);
 	st.close();
@@ -444,4 +471,16 @@ public class Model {
 	}
     }
 
+    public static class Transaction {
+	public int id;
+	public String date;
+	public BigDecimal amount;
+	public int debit;
+	public int credit;
+	public String comment;
+	Transaction() {}
+	public String toString() {
+	    return String.valueOf(id) + ": " + String.valueOf(debit) + " < $" + String.valueOf(amount) + " > " + String.valueOf(credit) + " @ " + date + " | " + comment;
+	}
+    }
 }

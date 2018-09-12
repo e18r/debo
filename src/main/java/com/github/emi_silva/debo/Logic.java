@@ -18,6 +18,9 @@ public class Logic {
     public void postAccounts(Model.Account a) throws Exception {
 	model.postAccounts(a);
     }
+    public void postTransactions(Model.Transaction t) throws Exception {
+	model.postTransactions(t);
+    }
 
     public ArrayList<Model.Currency> getCurrencies(Model.Currency c) {
 	return model.getCurrencies(c);

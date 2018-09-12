@@ -28,6 +28,15 @@ public class Controller {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
 		}
 	    });
+	On.post("/transactions").json((Model.Transaction t, Req req) -> {
+		try {
+		    logic.postTransactions(t);
+		    return req.response().result("").code(201);
+		}
+		catch(Exception e) {
+		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
+		}
+	    });
 	
 	On.get("/currencies").json((Model.Currency c) -> U.list(logic.getCurrencies(c)));
 	On.get("/accounts").json((Model.Account a) -> U.list(logic.getAccounts(a)));
