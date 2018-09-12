@@ -104,7 +104,7 @@ public class Model {
     /**
      * Finds a currency type id given its name
      */
-    public int findCurrencyType(String type) throws Exception {
+    public int findCurrencyTypeId(String type) throws Exception {
 	for(CurrencyType ct : getCurrencyTypes()) {
 	    if(ct.name.equals(type)) {
 		return ct.id;
@@ -143,7 +143,7 @@ public class Model {
      * Creates a currency
      */
     public void postCurrencies(Currency c) throws Exception, SQLException {
-	int type = findCurrencyType(c.type);
+	int type = findCurrencyTypeId(c.type);
 	String query = "INSERT INTO currencies (code, name, type) "
 	    + "VALUES ('" + c.code + "', '" + c.name + "', " + type + ")";
 	Statement st = conn.createStatement();
@@ -206,26 +206,27 @@ public class Model {
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
 	    + "JOIN currencies on accounts.currency = currencies.id";
-	boolean previousCondition = false;
+
 	if(filter.type != null || filter.name != null || filter.currency != null) {
 	    query += " WHERE ";
-	}
-	if(filter.type != null) {
-	    query += "account_types.name = '" + filter.type + "'";
-	    previousCondition = true;
-	}
-	if(filter.name != null) {
-	    if(previousCondition) {
-		query += " AND ";
+	    boolean firstCondition = true;
+	    if(filter.type != null) {
+		query += "account_types.name = '" + filter.type + "'";
+		firstCondition = false;
 	    }
-	    query += "accounts.name = '" + filter.name + "'";
-	    previousCondition = true;
-	}
-	if(filter.currency != null) {
-	    if(previousCondition) {
-		query += " AND ";
+	    if(filter.name != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		query += "accounts.name = '" + filter.name + "'";
+		firstCondition = false;
 	    }
-	    query += "currencies.code = '" + filter.currency + "'";
+	    if(filter.currency != null) {
+		if(firstCondition) {
+		    query += " AND ";
+		}
+		query += "currencies.code = '" + filter.currency + "'";
+	    }
 	}
 	try {
 	    Statement st = conn.createStatement();
@@ -313,24 +314,26 @@ public class Model {
     /**
      * Updates a currency
      */
-    public void patchCurrency(String code, Currency c) throws Exception,
-							    SQLException {
+    public void patchCurrency(String code, Currency c) throws Exception, SQLException {
 	String query = "UPDATE currencies SET ";
+	boolean firstStatement = true;
 	if(c.code != null) {
 	    query += "code = '" + c.code + "'";
-	    if(c.name != null || c.type != null) {
-		query += ", ";
-	    }
+	    firstStatement = false;
 	}
 	if(c.name != null) {
-	    query += "name = '" + c.name + "'";
-	    if(c.type != null) {
+	    if(!firstStatement) {
 		query += ", ";
 	    }
+	    query += "name = '" + c.name + "'";
+	    firstStatement = false;
 	}
 	if(c.type != null) {
-	    int type = findCurrencyType(c.type);
-	    query += "type = " + type;
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    int typeId = findCurrencyTypeId(c.type);
+	    query += "type = " + typeId;
 	}
 	query += " WHERE code = '" + code + "'";
 	Statement st = conn.createStatement();
@@ -338,6 +341,40 @@ public class Model {
 	st.close();
 	if(rowsUpdated == 0) {
 	    throw new Exception("Currency code not found.");
+	}
+    }
+
+    /**
+     * Updates an account
+     */
+    public void patchAccount(int id, Account a) throws Exception, SQLException {
+	String query = "UPDATE accounts SET ";
+	boolean firstStatement = true;
+	if(a.type != null) {
+	    int typeId = findAccountTypeId(a.type);
+	    query += "type = " + typeId;
+	    firstStatement = false;
+	}
+	if(a.name != null) {
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    query += "name = '" + a.name + "'";
+	    firstStatement = false;
+	}
+	if(a.currency != null) {
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    int currencyId = findCurrencyId(a.currency);
+	    query += "currency = " + currencyId;	    
+	}
+	query += " WHERE id = " + id;
+	Statement st = conn.createStatement();
+	int rowsUpdated = st.executeUpdate(query);
+	st.close();
+	if(rowsUpdated == 0) {
+	    throw new Exception("Account id not found.");
 	}
     }
 
@@ -351,6 +388,19 @@ public class Model {
 	st.close();
 	if(rowsDeleted == 0) {
 	    throw new Exception("Currency code not found.");
+	}
+    }
+
+    /**
+     * Deletes an account
+     */
+    public void deleteAccount(int id) throws Exception, SQLException {
+	String query = "DELETE FROM accounts WHERE id = " + id;
+	Statement st = conn.createStatement();
+	int rowsDeleted = st.executeUpdate(query);
+	st.close();
+	if(rowsDeleted == 0) {
+	    throw new Exception("Account id not found.");
 	}
     }
 

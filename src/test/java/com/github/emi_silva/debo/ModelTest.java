@@ -61,9 +61,9 @@ public class ModelTest extends TestCase {
     /**
      * Checks an id is found for an existing currency type name
      */
-    public void testFindCurrencyType() throws Exception {
+    public void testFindCurrencyTypeId() throws Exception {
 	model = new Model();
-	assertEquals(model.findCurrencyType("fiat"), 1);
+	assertEquals(model.findCurrencyTypeId("fiat"), 1);
     }
 
     /**

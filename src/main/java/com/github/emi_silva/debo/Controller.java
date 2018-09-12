@@ -45,7 +45,16 @@ public class Controller {
 	On.patch("/currency/{cod}").json((String cod, Model.Currency c, Req req) -> {
 		try {
 		    logic.patchCurrency(cod, c);
-		    return req.response().result("").code(200);
+		    return "";
+		}
+		catch(Exception e) {
+		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
+		}
+	    });
+	On.patch("/account/{idn}").json((String idn, Model.Account a, Req req) -> {
+		try {
+		    logic.patchAccount(idn, a);
+		    return "";
 		}
 		catch(Exception e) {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
@@ -55,7 +64,16 @@ public class Controller {
 	On.delete("/currency/{code}").json((String code, Req req) -> {
 		try {
 		    logic.deleteCurrency(code);
-		    return req.response().result("").code(200);
+		    return "";
+		}
+		catch(Exception e) {
+		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
+		}
+	    });
+	On.delete("/account/{id}").json((String id, Req req) -> {
+		try {
+		    logic.deleteAccount(id);
+		    return "";
 		}
 		catch(Exception e) {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);

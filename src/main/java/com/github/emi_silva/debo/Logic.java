@@ -43,12 +43,29 @@ public class Logic {
 
     public void patchCurrency(String code, Model.Currency c) throws Exception {
 	if(c.code == null && c.name == null && c.type == null) {
-	    throw new Exception("Please specify at least one field to patch");
+	    throw new Exception("Please specify at least one field to patch.");
 	}
 	model.patchCurrency(code, c);
+    }
+    public void patchAccount(String idString, Model.Account a) throws Exception {
+	int id = Integer.valueOf(idString);
+	if(id < 0 || id > MAX_INT) {
+	    throw new Exception("Invalid account id.");
+	}
+	if(a.type == null && a.name == null && a.currency == null) {
+	    throw new Exception("Please specify at least one field to patch.");
+	}
+	model.patchAccount(id, a);
     }
 
     public void deleteCurrency(String code) throws Exception {
 	model.deleteCurrency(code);
+    }
+    public void deleteAccount(String idString) throws Exception {
+	int id = Integer.valueOf(idString);
+	if(id < 0 || id > MAX_INT) {
+	    throw new Exception("Invalid account id.");
+	}
+	model.deleteAccount(id);
     }
 }
