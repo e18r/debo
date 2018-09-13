@@ -4,6 +4,8 @@ import java.util.ArrayList;
 
 public class Logic {
 
+    final int MAX_INT = 2147483647;
+
     private Model model;
 
     public Logic() {
@@ -11,17 +13,51 @@ public class Logic {
     }
 
     public Model.Currency postCurrencies(Model.Currency c) throws Exception {
-	String code = model.postCurrencies(c);
-	Model.Currency result = model.getCurrency(code);
-	return result;
+	if(c.code == null) {
+	    throw new Exception("Please specify a currency code");
+	}
+	if(c.name == null) {
+	    throw new Exception("Please specify a currency name.");
+	}
+	if(c.type == null) {
+	    throw new Exception("Please specify a currency type.");
+	}
+	String newCode = model.postCurrencies(c);
+	Model.Currency newCurrency = model.getCurrency(newCode);
+	return newCurrency;
     }
     public Model.Account postAccounts(Model.Account a) throws Exception {
-	String name = model.postAccounts(a);
-	Model.Account result = model.getAccount(name);
-	return result;
+	if(a.type == null) {
+	    throw new Exception("Please specify an account type.");
+	}
+	if(a.name == null) {
+	    throw new Exception("Please specify an account name.");
+	}
+	if(a.currency == null) {
+	    throw new Exception("Please specify a currency code.");
+	}
+	String newName = model.postAccounts(a);
+	Model.Account newAccount = model.getAccount(newName);
+	return newAccount;
     }
-    public int postTransactions(Model.Transaction t) throws Exception {
-	return model.postTransactions(t);
+    public Model.Transaction postTransactions(Model.Transaction t) throws Exception {
+	if(t.amount == null) {
+	    throw new Exception("Please specify an amount.");
+	}
+	if(t.debit == null) {
+	    throw new Exception("Please specify the name of the account to debit from.");
+	}
+	if(t.credit == null) {
+	    throw new Exception("Please specify the name of the account to credit from.");
+	}
+	Model.Account debitAccount = model.getAccount(t.debit);
+	Model.Account creditAccount = model.getAccount(t.credit);
+	if(!debitAccount.currency.equals(creditAccount.currency)) {
+	    throw new Exception("Currency mismatch.");
+	}
+	int newId = model.postTransactions(t);
+	Model.Transaction newTx = model.getTransaction(newId);
+	return newTx;
     }
 
     public ArrayList<Model.Currency> getCurrencies(Model.Currency c) {
@@ -40,9 +76,21 @@ public class Logic {
 	}
 	return model.getCurrency(code);
     }
-
-    public Model.Account getAccount(String name) throws Exception {
+    public Model.Account getAccount(String name) {
 	return model.getAccount(name);
+    }
+    public Model.Transaction getTransaction(String idString) {
+	int id;
+	try {
+	    id = Integer.valueOf(idString);
+	}
+	catch(Exception e) {
+	    return null;
+	}
+	if(id < 0 || id > MAX_INT) {
+	    return null;
+	}
+	return model.getTransaction(id);
     }
 
     public Model.Currency patchCurrency(String oldCode, Model.Currency c) throws Exception {

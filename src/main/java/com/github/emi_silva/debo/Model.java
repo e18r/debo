@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 
 
 // TODO: Sanitize queries to prevent SQL injection
+// TODO: Put closing statements in finally blocks to tackle DoS attacks
 
 public class Model {
 
@@ -144,6 +145,19 @@ public class Model {
     }
 
     /**
+     * Finds an account id given its name
+     */
+    public int findAccountId(String name) throws Exception {
+	ArrayList<Account> accounts = getAccounts(new Account());
+	for(Account a : accounts) {
+	    if(a.name.equals(name)) {
+		return a.id;
+	    }
+	}
+	throw new Exception("Account id not found.");
+    }
+
+    /**
      * Creates a currency
      */
     public String postCurrencies(Currency c) throws Exception, SQLException {
@@ -186,7 +200,9 @@ public class Model {
     /**
      * Creates a transaction
      */
-    public int postTransactions(Transaction t) throws SQLException {
+    public int postTransactions(Transaction t) throws Exception, SQLException {
+	int debitId = findAccountId(t.debit);
+	int creditId = findAccountId(t.credit);
 	String query = "INSERT INTO transactions (";
 	if(t.date != null) {
 	    query += "date, ";
@@ -199,7 +215,7 @@ public class Model {
 	if(t.date != null) {
 	    query += "TIMESTAMP WITH TIME ZONE '" + t.date + "', ";
 	}
-	query += t.amount.toPlainString() + ", " + t.debit + ", " + t.credit;
+	query += t.amount.toPlainString() + ", " + debitId + ", " + creditId;
 	if(t.comment != null) {
 	    query += ", '" + t.comment + "'";
 	}
@@ -456,6 +472,43 @@ public class Model {
 	    System.out.println(e);
 	}
 	return a;
+    }
+
+    /**
+     * Returns a single transaction
+     */
+    public Transaction getTransaction(int id) {
+	Transaction t = new Transaction();
+	String query = "SELECT t.id, t.date, t.amount, coalesce(c_debit.code, c_credit.code), "
+	    + "a_debit.name, a_credit.name, t.comment "
+	    + "FROM transactions t "
+	    + "LEFT JOIN accounts a_debit ON t.debit = a_debit.id "
+	    + "LEFT JOIN accounts a_credit ON t.credit = a_credit.id "
+	    + "LEFT JOIN currencies c_debit ON a_debit.currency = c_debit.id "
+	    + "LEFT JOIN currencies c_credit ON a_credit.currency = c_credit.id "
+	    + "WHERE t.id = " + id;
+	try {
+	    Statement st = conn.createStatement();
+	    ResultSet rs = st.executeQuery(query);
+	    if(rs.next()) {
+		t.id = rs.getInt(1);
+		t.date = rs.getString(2);
+		t.amount = rs.getBigDecimal(3);
+		t.currency = rs.getString(4);
+		t.debit = rs.getString(5);
+		t.credit = rs.getString(6);
+		t.comment = rs.getString(7);
+	    }
+	    else {
+		t = null;
+	    }
+	    rs.close();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    System.out.println(e);
+	}
+	return t;
     }
 
     /**
