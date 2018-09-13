@@ -67,21 +67,20 @@ VALUES (1, 'asset'),
 
 CREATE TABLE debo.accounts (
        id SERIAL PRIMARY KEY,
-       name VARCHAR NOT NULL,
+       name VARCHAR UNIQUE NOT NULL,
        currency INT NOT NULL REFERENCES debo.currencies,
-       type INT NOT NULL REFERENCES debo.account_types,
-       CONSTRAINT uniqueness UNIQUE (name, currency, type)
+       type INT NOT NULL REFERENCES debo.account_types
 );
 
 INSERT INTO debo.accounts (name, currency, type)
 VALUES ('Bancolombia', 5, 1),
        ('wallet', 5, 1),
-       ('wallet', 6, 1),
+       ('Samourai', 6, 1),
        ('restaurant', 5, 4);
 
 CREATE TABLE debo.transactions (
        id SERIAL PRIMARY KEY,
-       date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       date TIMESTAMP (0) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
        amount NUMERIC NOT NULL,
        debit INT REFERENCES debo.accounts,
        credit INT REFERENCES debo.accounts,
@@ -93,4 +92,9 @@ INSERT INTO debo.transactions (amount, debit, credit, comment)
 VALUES (35450, 1, NULL, 'initial balance'),
        (22000, 2, NULL, 'initial balance'),
        (0.58374957, 3, NULL, 'initial balance'),
-       (12000, 4, 2, 'McDonalds with friends');
+       (12000, 4, 2, 'McDonalds with friends'),
+       (600000, 2, 1, 'took some bucks out of the ATM'),
+       (35550, 4, 2, NULL),
+       (100000, 1, 2, 'I deposited some money in my bank account'),
+       (10000, 2, 4, 'Got a refund from the restaurant'),
+       (123450, NULL, 4, 'the restaurant had refunded me in the past');

@@ -43,28 +43,19 @@ public class Controller {
 	On.get("/transactions").json((Model.TxFilter t) -> U.list(logic.getTransactions(t)));
 	
 	On.get("/currency/{code}").json((String code) -> logic.getCurrency(code));
-	On.get("/account/{id}").json((String id, Req req) -> {
-		try {
-		    return logic.getAccount(id);
-		}
-		catch(Exception e) {
-		return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
-		}
-	    });
+	On.get("/account/{name}").json((String name) -> logic.getAccount(name));
 	
-	On.patch("/currency/{cod}").json((String cod, Model.Currency c, Req req) -> {
+	On.patch("/currency/{oldCode}").json((String oldCode, Model.Currency c, Req req) -> {
 		try {
-		    logic.patchCurrency(cod, c);
-		    return "";
+		    return logic.patchCurrency(oldCode, c);
 		}
 		catch(Exception e) {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
 		}
 	    });
-	On.patch("/account/{idn}").json((String idn, Model.Account a, Req req) -> {
+	On.patch("/account/{oldName}").json((String oldName, Model.Account a, Req req) -> {
 		try {
-		    logic.patchAccount(idn, a);
-		    return "";
+		    return logic.patchAccount(oldName, a);
 		}
 		catch(Exception e) {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
@@ -80,9 +71,9 @@ public class Controller {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
 		}
 	    });
-	On.delete("/account/{id}").json((String id, Req req) -> {
+	On.delete("/account/{name}").json((String name, Req req) -> {
 		try {
-		    logic.deleteAccount(id);
+		    logic.deleteAccount(name);
 		    return "";
 		}
 		catch(Exception e) {

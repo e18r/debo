@@ -4,8 +4,6 @@ import java.util.ArrayList;
 
 public class Logic {
 
-    final int MAX_INT = 2147483647;
-
     private Model model;
 
     public Logic() {
@@ -18,8 +16,8 @@ public class Logic {
 	return result;
     }
     public Model.Account postAccounts(Model.Account a) throws Exception {
-	int id = model.postAccounts(a);
-	Model.Account result = model.getAccount(id);
+	String name = model.postAccounts(a);
+	Model.Account result = model.getAccount(name);
 	return result;
     }
     public int postTransactions(Model.Transaction t) throws Exception {
@@ -43,39 +41,29 @@ public class Logic {
 	return model.getCurrency(code);
     }
 
-    public Model.Account getAccount(String idString) throws Exception {
-	int id = Integer.valueOf(idString);
-	if(id < 0 || id > MAX_INT) {
-	    return null;
-	}
-	return model.getAccount(id);
+    public Model.Account getAccount(String name) throws Exception {
+	return model.getAccount(name);
     }
 
-    public void patchCurrency(String code, Model.Currency c) throws Exception {
+    public Model.Currency patchCurrency(String oldCode, Model.Currency c) throws Exception {
 	if(c.code == null && c.name == null && c.type == null) {
 	    throw new Exception("Please specify at least one field to patch.");
 	}
-	model.patchCurrency(code, c);
+	String newCode = model.patchCurrency(oldCode, c);
+	return model.getCurrency(newCode);
     }
-    public void patchAccount(String idString, Model.Account a) throws Exception {
-	int id = Integer.valueOf(idString);
-	if(id < 0 || id > MAX_INT) {
-	    throw new Exception("Invalid account id.");
-	}
+    public Model.Account patchAccount(String oldName, Model.Account a) throws Exception {
 	if(a.type == null && a.name == null && a.currency == null) {
 	    throw new Exception("Please specify at least one field to patch.");
 	}
-	model.patchAccount(id, a);
+	String newName = model.patchAccount(oldName, a);
+	return model.getAccount(newName);
     }
 
     public void deleteCurrency(String code) throws Exception {
 	model.deleteCurrency(code);
     }
-    public void deleteAccount(String idString) throws Exception {
-	int id = Integer.valueOf(idString);
-	if(id < 0 || id > MAX_INT) {
-	    throw new Exception("Invalid account id.");
-	}
-	model.deleteAccount(id);
+    public void deleteAccount(String name) throws Exception {
+	model.deleteAccount(name);
     }
 }
