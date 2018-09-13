@@ -12,8 +12,8 @@ public class Controller {
 
 	On.post("/currencies").json((Model.Currency c, Req req) -> {
 		try {
-		    logic.postCurrencies(c);
-		    return req.response().result("").code(201);
+		    Model.Currency result = logic.postCurrencies(c);
+		    return req.response().result(result).code(201);
 		}
 		catch(Exception e) {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
@@ -21,8 +21,8 @@ public class Controller {
 	    });
 	On.post("/accounts").json((Model.Account a, Req req) -> {
 		try {
-		    logic.postAccounts(a);
-		    return req.response().result("").code(201);
+		    Model.Account result = logic.postAccounts(a);
+		    return req.response().result(result).code(201);
 		}
 		catch(Exception e) {
 		    return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
@@ -40,6 +40,7 @@ public class Controller {
 	
 	On.get("/currencies").json((Model.Currency c) -> U.list(logic.getCurrencies(c)));
 	On.get("/accounts").json((Model.Account a) -> U.list(logic.getAccounts(a)));
+	On.get("/transactions").json((Model.TxFilter t) -> U.list(logic.getTransactions(t)));
 	
 	On.get("/currency/{code}").json((String code) -> logic.getCurrency(code));
 	On.get("/account/{id}").json((String id, Req req) -> {

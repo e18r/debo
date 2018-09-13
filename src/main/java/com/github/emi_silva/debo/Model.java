@@ -143,32 +143,44 @@ public class Model {
     /**
      * Creates a currency
      */
-    public void postCurrencies(Currency c) throws Exception, SQLException {
+    public String postCurrencies(Currency c) throws Exception, SQLException {
 	int type = findCurrencyTypeId(c.type);
 	String query = "INSERT INTO currencies (code, name, type) "
-	    + "VALUES ('" + c.code + "', '" + c.name + "', " + type + ")";
+	    + "VALUES ('" + c.code + "', '" + c.name + "', " + type + ")"
+	    + "RETURNING code";
 	Statement st = conn.createStatement();
-	int rowsInserted = st.executeUpdate(query);
+	st.execute(query);
+	ResultSet rs = st.getResultSet();
+	rs.next();
+	String code = rs.getString(1);
+	rs.close();
 	st.close();
+	return code;
     }
     
     /**
      * Creates an account
      */
-    public void postAccounts(Account a) throws Exception, SQLException {
+    public int postAccounts(Account a) throws Exception, SQLException {
 	int currencyId = findCurrencyId(a.currency);
 	int typeId = findAccountTypeId(a.type);
 	String query = "INSERT INTO accounts (name, currency, type) "
-	    + "VALUES ('" + a.name + "', " + currencyId + ", " + typeId + ")";
+	    + "VALUES ('" + a.name + "', " + currencyId + ", " + typeId + ")"
+	    + "RETURNING id";
 	Statement st = conn.createStatement();
-	st.executeUpdate(query);
+	st.execute(query);
+	ResultSet rs = st.getResultSet();
+	rs.next();
+	int id = rs.getInt(1);
+	rs.close();
 	st.close();
+	return id;
     }
 
     /**
      * Creates a transaction
      */
-    public void postTransactions(Transaction t) throws SQLException {
+    public int postTransactions(Transaction t) throws SQLException {
 	String query = "INSERT INTO transactions (";
 	if(t.date != null) {
 	    query += "date, ";
@@ -185,10 +197,15 @@ public class Model {
 	if(t.comment != null) {
 	    query += ", '" + t.comment + "'";
 	}
-	query += ")";
+	query += ") RETURNING id";
 	Statement st = conn.createStatement();
-	st.executeUpdate(query);
+	st.execute(query);
+	ResultSet rs = st.getResultSet();
+	rs.next();
+	int id = rs.getInt(1);
+	rs.close();
 	st.close();
+	return id;
     }
 
     /**
@@ -233,20 +250,21 @@ public class Model {
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
 	    + "JOIN currencies on accounts.currency = currencies.id";
-
 	if(filter.type != null || filter.name != null || filter.currency != null) {
-	    query += " WHERE ";
 	    boolean firstCondition = true;
+	    query += " WHERE ";
 	    if(filter.type != null) {
-		query += "account_types.name = '" + filter.type + "'";
 		firstCondition = false;
+		query += "account_types.name = '" + filter.type + "'";
 	    }
 	    if(filter.name != null) {
 		if(!firstCondition) {
 		    query += " AND ";
 		}
+		else {
+		    firstCondition = false;		    
+		}
 		query += "accounts.name = '" + filter.name + "'";
-		firstCondition = false;
 	    }
 	    if(filter.currency != null) {
 		if(firstCondition) {
@@ -273,6 +291,110 @@ public class Model {
 	    System.out.println(e);
 	}
 	return accounts;
+    }
+
+    /**
+     * Returns a (filtered) list of transactions
+     */
+    public ArrayList<Transaction> getTransactions(TxFilter f) {
+	ArrayList<Transaction> transactions = new ArrayList<Transaction>();
+	String query = "SELECT t.id, t.date, t.amount, coalesce(c1.code, c2.code), t.debit, t.credit, t.comment "
+	    + "FROM transactions t "
+	    + "LEFT JOIN accounts a1 ON t.debit = a1.id "
+	    + "LEFT JOIN accounts a2 ON t.credit = a2.id "
+	    + "LEFT JOIN currencies c1 ON a1.currency = c1.id "
+	    + "LEFT JOIN currencies c2 ON a2.currency = c2.id";
+	if(f.minDate != null || f.maxDate != null || f.minAmount != null || f.maxAmount != null
+	   || f.debit != null || f.credit != null || f.account != null || f.commentHas != null) {
+	    boolean firstCondition = true;
+	    query += " WHERE ";
+	    if(f.minDate != null) {
+		firstCondition = false;
+		query += "date > '" + f.minDate + "'";
+	    }
+	    if(f.maxDate != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		else {
+		    firstCondition = false;
+		}
+		query += "date < '" + f.maxDate + "'";
+	    }
+	    if(f.minAmount != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		else {
+		    firstCondition = false;
+		}
+		query += "amount > " + f.minAmount;
+	    }
+	    if(f.maxAmount != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		else {
+		    firstCondition = false;
+		}
+		query += "amount < " + f.maxAmount;
+	    }
+	    if(f.debit != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		else {
+		    firstCondition = false;
+		}
+		query += "debit = " + f.debit;
+	    }
+	    if(f.credit != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		else {
+		    firstCondition = false;
+		}
+		query += "credit = " + f.credit;
+	    }
+	    if(f.account != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		else {
+		    firstCondition = false;
+		}
+		query += "(credit = " + f.account + " OR debit = " + f.account + ")";
+	    }
+	    if(f.commentHas != null) {
+		String pattern = f.commentHas.replace(" ", ".*");
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		query += "comment ~* '" + pattern + "'";
+	    }
+	}
+	try {
+	    Statement st = conn.createStatement();
+	    ResultSet rs = st.executeQuery(query);
+	    while(rs.next()) {
+		Transaction t = new Transaction();
+		t.id = rs.getInt(1);
+		t.date = rs.getString(2);
+		t.amount = rs.getBigDecimal(3);
+		t.currency = rs.getString(4);
+		t.debit = rs.getObject(5, Integer.class);
+		t.credit = rs.getObject(6, Integer.class);
+		t.comment = rs.getString(7);
+		transactions.add(t);
+	    }
+	    rs.close();
+	    st.close();
+	}
+	catch (SQLException e) {
+	    System.out.println(e);
+	}
+	return transactions;
     }
     
     /**
@@ -471,16 +593,32 @@ public class Model {
 	}
     }
 
+    public static class TxFilter {
+	public String minDate;
+	public String maxDate;
+	public BigDecimal minAmount;
+	public BigDecimal maxAmount;
+	public Integer debit;
+	public Integer credit;
+	public Integer account;
+	public String commentHas;
+	TxFilter() {}
+	public String toString() {
+	    return "\"" + commentHas + "\" (" + debit + ":" + credit + ") $" + minAmount + " - " + maxAmount + "$ <" + minDate + " - " + maxDate + ">";
+	}
+    }
+
     public static class Transaction {
 	public int id;
 	public String date;
 	public BigDecimal amount;
-	public int debit;
-	public int credit;
+	public String currency;
+	public Integer debit;
+	public Integer credit;
 	public String comment;
 	Transaction() {}
 	public String toString() {
-	    return String.valueOf(id) + ": " + String.valueOf(debit) + " < $" + String.valueOf(amount) + " > " + String.valueOf(credit) + " @ " + date + " | " + comment;
+	    return String.valueOf(id) + ": " + String.valueOf(debit) + " < $" + String.valueOf(amount) + " " + currency + " > " + String.valueOf(credit) + " @ " + date + " | " + comment;
 	}
     }
 }

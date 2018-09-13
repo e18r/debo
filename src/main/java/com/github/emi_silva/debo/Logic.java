@@ -12,14 +12,18 @@ public class Logic {
 	model = new Model();
     }
 
-    public void postCurrencies(Model.Currency c) throws Exception {
-	model.postCurrencies(c);
+    public Model.Currency postCurrencies(Model.Currency c) throws Exception {
+	String code = model.postCurrencies(c);
+	Model.Currency result = model.getCurrency(code);
+	return result;
     }
-    public void postAccounts(Model.Account a) throws Exception {
-	model.postAccounts(a);
+    public Model.Account postAccounts(Model.Account a) throws Exception {
+	int id = model.postAccounts(a);
+	Model.Account result = model.getAccount(id);
+	return result;
     }
-    public void postTransactions(Model.Transaction t) throws Exception {
-	model.postTransactions(t);
+    public int postTransactions(Model.Transaction t) throws Exception {
+	return model.postTransactions(t);
     }
 
     public ArrayList<Model.Currency> getCurrencies(Model.Currency c) {
@@ -27,6 +31,9 @@ public class Logic {
     }
     public ArrayList<Model.Account> getAccounts(Model.Account a) {
 	return model.getAccounts(a);
+    }
+    public ArrayList<Model.Transaction> getTransactions(Model.TxFilter t) {
+	return model.getTransactions(t);
     }
 
     public Model.Currency getCurrency(String code) {
