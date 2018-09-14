@@ -40,6 +40,15 @@ public class Logic {
 	Model.Account newAccount = model.getAccount(newName);
 	return newAccount;
     }
+
+    private void checkCurrencies(String debit, String credit) throws Exception {
+	Model.Account debitAccount = model.getAccount(debit);
+	Model.Account creditAccount = model.getAccount(credit);
+	if(!debitAccount.currency.equals(creditAccount.currency)) {
+	    throw new Exception("Currency mismatch.");
+	}
+    }
+    
     public Model.Transaction postTransactions(Model.Transaction t) throws Exception {
 	if(t.amount == null) {
 	    throw new Exception("Please specify an amount.");
@@ -50,11 +59,7 @@ public class Logic {
 	if(t.credit == null) {
 	    throw new Exception("Please specify the name of the account to credit from.");
 	}
-	Model.Account debitAccount = model.getAccount(t.debit);
-	Model.Account creditAccount = model.getAccount(t.credit);
-	if(!debitAccount.currency.equals(creditAccount.currency)) {
-	    throw new Exception("Currency mismatch.");
-	}
+	checkCurrencies(t.debit, t.credit);
 	int newId = model.postTransactions(t);
 	Model.Transaction newTx = model.getTransaction(newId);
 	return newTx;
@@ -107,11 +112,42 @@ public class Logic {
 	String newName = model.patchAccount(oldName, a);
 	return model.getAccount(newName);
     }
+    public Model.Transaction patchTransaction(String idString, Model.Transaction t) throws Exception {
+	int id;
+	id = Integer.valueOf(idString);
+	if(t.date == null && t.amount == null && t.debit == null && t.credit == null
+	   && t.comment == null) {
+	    throw new Exception("Please specify at least one field to patch.");
+	}
+	Model.Transaction oldTx = model.getTransaction(id);
+	String debit;
+	if(t.debit != null) {
+	    debit = t.debit;
+	}
+	else {
+	    debit = oldTx.debit;
+	}
+	String credit;
+	if(t.credit != null) {
+	    credit = t.credit;
+	}
+	else {
+	    credit = oldTx.credit;
+	}
+	checkCurrencies(debit, credit);
+	model.patchTransaction(id, t);
+	return model.getTransaction(id);
+    }
 
     public void deleteCurrency(String code) throws Exception {
 	model.deleteCurrency(code);
     }
     public void deleteAccount(String name) throws Exception {
 	model.deleteAccount(name);
+    }
+    public void deleteTransaction(String idString) throws Exception {
+	int id;
+	id = Integer.valueOf(idString);
+	model.deleteTransaction(id);
     }
 }

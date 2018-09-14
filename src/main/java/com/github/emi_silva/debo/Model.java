@@ -181,9 +181,6 @@ public class Model {
     public String postAccounts(Account a) throws Exception, SQLException {
 	int currencyId = findCurrencyId(a.currency);
 	int typeId = findAccountTypeId(a.type);
-	if(a.name == null) {
-	    throw new Exception("Please specify an account name.");
-	}
 	String query = "INSERT INTO accounts (name, currency, type) "
 	    + "VALUES ('" + a.name + "', " + currencyId + ", " + typeId + ")"
 	    + "RETURNING name";
@@ -518,15 +515,17 @@ public class Model {
 	String query = "UPDATE currencies SET ";
 	boolean firstStatement = true;
 	if(c.code != null) {
-	    query += "code = '" + c.code + "'";
 	    firstStatement = false;
+	    query += "code = '" + c.code + "'";
 	}
 	if(c.name != null) {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
+	    else {
+		firstStatement = false;
+	    }
 	    query += "name = '" + c.name + "'";
-	    firstStatement = false;
 	}
 	if(c.type != null) {
 	    if(!firstStatement) {
@@ -558,16 +557,18 @@ public class Model {
 	String query = "UPDATE accounts SET ";
 	boolean firstStatement = true;
 	if(a.type != null) {
+	    firstStatement = false;
 	    int typeId = findAccountTypeId(a.type);
 	    query += "type = " + typeId;
-	    firstStatement = false;
 	}
 	if(a.name != null) {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
+	    else {
+		firstStatement = false;
+	    }
 	    query += "name = '" + a.name + "'";
-	    firstStatement = false;
 	}
 	if(a.currency != null) {
 	    if(!firstStatement) {
@@ -593,6 +594,60 @@ public class Model {
     }
 
     /**
+     * Updates a transaction
+     */
+    public void patchTransaction(int id, Transaction t) throws Exception, SQLException {
+	String query = "UPDATE transactions SET ";
+	boolean firstStatement = true;
+	if(t.date != null) {
+	    firstStatement = false;
+	    query += "date = TIMESTAMP WITH TIME ZONE '" + t.date + "'";
+	}
+	if(t.amount != null) {
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    else {
+		firstStatement = false;
+	    }
+	    query += "amount = " + t.amount;
+	}
+	if(t.debit != null) {
+	    int debitId = findAccountId(t.debit);
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    else {
+		firstStatement = false;
+	    }
+	    query += "debit = " + debitId;
+	}
+	if(t.credit != null) {
+	    int creditId = findAccountId(t.credit);
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    else {
+		firstStatement = false;
+	    }
+	    query += "credit = " + creditId;
+	}
+	if(t.comment != null) {
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    query += "comment = '" + t.comment + "'";
+	}
+	query += " WHERE id = " + id;
+	Statement st = conn.createStatement();
+	int rowsUpdated = st.executeUpdate(query);
+	st.close();
+	if(rowsUpdated == 0) {
+	    throw new Exception("Transaction id not found.");
+	}
+    }
+
+    /**
      * Deletes a currency
      */
     public void deleteCurrency(String code) throws Exception, SQLException {
@@ -615,6 +670,19 @@ public class Model {
 	st.close();
 	if(rowsDeleted == 0) {
 	    throw new Exception("Account name not found.");
+	}
+    }
+
+    /**
+     * Deletes a transaction
+     */
+    public void deleteTransaction(int id) throws Exception, SQLException {
+	String query = "DELETE FROM transactions WHERE id = " + id;
+	Statement st = conn.createStatement();
+	int rowsDeleted = st.executeUpdate(query);
+	st.close();
+	if(rowsDeleted == 0) {
+	    throw new Exception("Transaction id not found.");
 	}
     }
 
