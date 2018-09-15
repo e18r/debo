@@ -48,6 +48,7 @@ public class Model {
 	try {
 	    FileReader file = new FileReader(location.getPath());
 	    props.load(file);
+	    file.close();
 	}
 	catch (FileNotFoundException e) {
 	    System.out.println(e);
@@ -56,6 +57,66 @@ public class Model {
 	    System.out.println(e);
 	}
 	return props;
+    }
+
+    /**
+     * Creates a new user
+     */
+    public void newUser(String email, String sessionToken) throws Exception {
+	String query = "INSERT INTO users (email, session_token) "
+	    + "VALUES ('" + email + "', '"+ sessionToken +"')";
+	Statement st = conn.createStatement();
+	int rowsInserted = st.executeUpdate(query);
+	if(rowsInserted != 1) {
+	    throw new Exception("There was an error creating the user.");
+	}
+	st.close();
+    }
+
+    /**
+     * Retrieves a session token
+     */
+    public String getSessionToken(String email) throws Exception {
+	String sessionToken;
+	String query = "SELECT session_token FROM users "
+	    + "WHERE email = '" + email + "'";
+	try {
+	    Statement st = conn.createStatement();
+	    ResultSet rs = st.executeQuery(query);
+	    if(rs.next()) {
+		sessionToken = rs.getString(1);
+	    }
+	    else {
+		throw new Exception("This user is not registered.");
+	    }
+	    rs.close();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    System.out.println(e);
+	    return null;
+	}
+	return sessionToken;
+    }
+
+    /**
+     * Authenticates a user
+     */
+    public int authenticate(String sessionToken) throws Exception {
+	String query = "SELECT id FROM users WHERE session_token = '" + sessionToken + "'";
+	Statement st = conn.createStatement();
+	ResultSet rs = st.executeQuery(query);
+	if(rs.next()) {
+	    int userId = rs.getInt(1);
+	    rs.close();
+	    st.close();
+	    return userId;
+	}
+	else {
+	    rs.close();
+	    st.close();
+	    throw new Exception("User not authenticated.");
+	}
     }
 
     /**
@@ -121,8 +182,8 @@ public class Model {
     /**
      * Finds a currency id given its code
      */
-    public int findCurrencyId(String code) throws Exception {
-	ArrayList<Currency> currencies = getCurrencies(new Currency());
+    public int findCurrencyId(String code, int userId) throws Exception {
+	ArrayList<Currency> currencies = getCurrencies(new Currency(), userId);
 	for(Currency c : currencies) {
 	    if(c.code.equals(code)) {
 		return c.id;
@@ -147,8 +208,8 @@ public class Model {
     /**
      * Finds an account id given its name
      */
-    public int findAccountId(String name) throws Exception {
-	ArrayList<Account> accounts = getAccounts(new Account());
+    public int findAccountId(String name, int userId) throws Exception {
+	ArrayList<Account> accounts = getAccounts(new Account(), userId);
 	for(Account a : accounts) {
 	    if(a.name.equals(name)) {
 		return a.id;
@@ -160,10 +221,10 @@ public class Model {
     /**
      * Creates a currency
      */
-    public String postCurrencies(Currency c) throws Exception, SQLException {
+    public String postCurrencies(Currency c, int userId) throws Exception, SQLException {
 	int type = findCurrencyTypeId(c.type);
-	String query = "INSERT INTO currencies (code, name, type) "
-	    + "VALUES ('" + c.code + "', '" + c.name + "', " + type + ")"
+	String query = "INSERT INTO currencies (user_id, code, name, type) "
+	    + "VALUES (" + userId + ", '" + c.code + "', '" + c.name + "', " + type + ")"
 	    + "RETURNING code";
 	Statement st = conn.createStatement();
 	st.execute(query);
@@ -178,11 +239,11 @@ public class Model {
     /**
      * Creates an account
      */
-    public String postAccounts(Account a) throws Exception, SQLException {
-	int currencyId = findCurrencyId(a.currency);
+    public String postAccounts(Account a, int userId) throws Exception, SQLException {
+	int currencyId = findCurrencyId(a.currency, userId);
 	int typeId = findAccountTypeId(a.type);
-	String query = "INSERT INTO accounts (name, currency, type) "
-	    + "VALUES ('" + a.name + "', " + currencyId + ", " + typeId + ")"
+	String query = "INSERT INTO accounts (user_id, name, currency, type) "
+	    + "VALUES (" + userId + ", '" + a.name + "', " + currencyId + ", " + typeId + ")"
 	    + "RETURNING name";
 	Statement st = conn.createStatement();
 	st.execute(query);
@@ -197,10 +258,10 @@ public class Model {
     /**
      * Creates a transaction
      */
-    public int postTransactions(Transaction t) throws Exception, SQLException {
-	int debitId = findAccountId(t.debit);
-	int creditId = findAccountId(t.credit);
-	String query = "INSERT INTO transactions (";
+    public int postTransactions(Transaction t, int userId) throws Exception, SQLException {
+	int debitId = findAccountId(t.debit, userId);
+	int creditId = findAccountId(t.credit, userId);
+	String query = "INSERT INTO transactions (user_id, ";
 	if(t.date != null) {
 	    query += "date, ";
 	}
@@ -208,7 +269,7 @@ public class Model {
 	if(t.comment != null) {
 	    query += ", comment";
 	}
-	query += ") VALUES (";
+	query += ") VALUES (" + userId + ", ";
 	if(t.date != null) {
 	    query += "TIMESTAMP WITH TIME ZONE '" + t.date + "', ";
 	}
@@ -230,14 +291,15 @@ public class Model {
     /**
      * Returns a (filtered) list of currencies
      */
-    public ArrayList<Currency> getCurrencies(Currency filter) {
+    public ArrayList<Currency> getCurrencies(Currency filter, int userId) {
 	ArrayList<Currency> currencies = new ArrayList<Currency>();
 	String query = "SELECT currencies.id, code, currencies.name, "
 	    + "currency_types.name "
 	    + "FROM currencies "
-	    + "JOIN currency_types ON currencies.type = currency_types.id";
+	    + "JOIN currency_types ON currencies.type = currency_types.id "
+	    + "WHERE user_id = " + userId;
 	if(filter.type != null) {
-	    query += " WHERE currency_types.name = '" + filter.type + "'";
+	    query += " AND currency_types.name = '" + filter.type + "'";
 	}
 	try {
 	    Statement st = conn.createStatement();
@@ -262,16 +324,17 @@ public class Model {
     /**
      * Returns a (filtered) list of accounts
      */
-    public ArrayList<Account> getAccounts(Account filter) {
+    public ArrayList<Account> getAccounts(Account filter, int userId) {
 	ArrayList<Account> accounts = new ArrayList<Account>();
 	String query = "SELECT accounts.id, account_types.name, accounts.name, "
 	    + "currencies.code "
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
-	    + "JOIN currencies on accounts.currency = currencies.id";
+	    + "JOIN currencies on accounts.currency = currencies.id "
+	    + "WHERE accounts.user_id = " + userId;
 	if(filter.type != null || filter.currency != null) {
 	    boolean firstCondition = true;
-	    query += " WHERE ";
+	    query += " AND ";
 	    if(filter.type != null) {
 		firstCondition = false;
 		query += "account_types.name = '" + filter.type + "'";
@@ -306,7 +369,7 @@ public class Model {
     /**
      * Returns a (filtered) list of transactions
      */
-    public ArrayList<Transaction> getTransactions(TxFilter f) {
+    public ArrayList<Transaction> getTransactions(TxFilter f, int userId) {
 	ArrayList<Transaction> transactions = new ArrayList<Transaction>();
 	String query = "SELECT t.id, t.date, t.amount, coalesce(c_debit.code, c_credit.code), "
 	    + "a_debit.name, a_credit.name, t.comment "
@@ -314,11 +377,12 @@ public class Model {
 	    + "LEFT JOIN accounts a_debit ON t.debit = a_debit.id "
 	    + "LEFT JOIN accounts a_credit ON t.credit = a_credit.id "
 	    + "LEFT JOIN currencies c_debit ON a_debit.currency = c_debit.id "
-	    + "LEFT JOIN currencies c_credit ON a_credit.currency = c_credit.id";
+	    + "LEFT JOIN currencies c_credit ON a_credit.currency = c_credit.id "
+	    + "WHERE t.user_id = " + userId;
 	if(f.minDate != null || f.maxDate != null || f.minAmount != null || f.maxAmount != null
 	   || f.debit != null || f.credit != null || f.account != null || f.commentHas != null) {
 	    boolean firstCondition = true;
-	    query += " WHERE ";
+	    query += " AND ";
 	    if(f.minDate != null) {
 		firstCondition = false;
 		query += "date > '" + f.minDate + "'";
@@ -411,13 +475,13 @@ public class Model {
     /**
      * Returns a single currency
      */
-    public Currency getCurrency(String code) {
+    public Currency getCurrency(String code, int userId) {
 	Currency c = new Currency();
 	String query = "SELECT currencies.id, code, currencies.name, "
 	    + "currency_types.name "
 	    + "FROM currencies "
 	    + "JOIN currency_types ON currencies.type = currency_types.id "
-	    + "WHERE code = '" + code + "'";
+	    + "WHERE user_id = " + userId + " AND code = '" + code + "'";
 	try {
 	    Statement st = conn.createStatement();
 	    ResultSet rs = st.executeQuery(query);
@@ -442,14 +506,14 @@ public class Model {
     /**
      * Returns a single account
      */
-    public Account getAccount(String name) {
+    public Account getAccount(String name, int userId) {
 	Account a = new Account();
 	String query = "SELECT accounts.id, account_types.name, accounts.name, "
 	    + "currencies.code "
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
 	    + "JOIN currencies ON accounts.currency = currencies.id "
-	    + "WHERE accounts.name = '" + name + "'";
+	    + "WHERE accounts.user_id = " + userId + " AND accounts.name = '" + name + "'";
 	try {
 	    Statement st = conn.createStatement();
 	    ResultSet rs = st.executeQuery(query);
@@ -474,7 +538,7 @@ public class Model {
     /**
      * Returns a single transaction
      */
-    public Transaction getTransaction(int id) {
+    public Transaction getTransaction(int id, int userId) {
 	Transaction t = new Transaction();
 	String query = "SELECT t.id, t.date, t.amount, coalesce(c_debit.code, c_credit.code), "
 	    + "a_debit.name, a_credit.name, t.comment "
@@ -483,7 +547,7 @@ public class Model {
 	    + "LEFT JOIN accounts a_credit ON t.credit = a_credit.id "
 	    + "LEFT JOIN currencies c_debit ON a_debit.currency = c_debit.id "
 	    + "LEFT JOIN currencies c_credit ON a_credit.currency = c_credit.id "
-	    + "WHERE t.id = " + id;
+	    + "WHERE t.user_id = " + userId + " AND t.id = " + id;
 	try {
 	    Statement st = conn.createStatement();
 	    ResultSet rs = st.executeQuery(query);
@@ -511,7 +575,7 @@ public class Model {
     /**
      * Updates a currency
      */
-    public String patchCurrency(String oldCode, Currency c) throws Exception, SQLException {
+    public String patchCurrency(String oldCode, Currency c, int userId) throws Exception, SQLException {
 	String query = "UPDATE currencies SET ";
 	boolean firstStatement = true;
 	if(c.code != null) {
@@ -534,7 +598,7 @@ public class Model {
 	    int typeId = findCurrencyTypeId(c.type);
 	    query += "type = " + typeId;
 	}
-	query += " WHERE code = '" + oldCode + "' RETURNING code";
+	query += " WHERE user_id = " + userId + " AND code = '" + oldCode + "' RETURNING code";
 	Statement st = conn.createStatement();
 	st.execute(query);
 	ResultSet rs = st.getResultSet();
@@ -553,7 +617,7 @@ public class Model {
     /**
      * Updates an account
      */
-    public String patchAccount(String oldName, Account a) throws Exception, SQLException {
+    public String patchAccount(String oldName, Account a, int userId) throws Exception, SQLException {
 	String query = "UPDATE accounts SET ";
 	boolean firstStatement = true;
 	if(a.type != null) {
@@ -574,10 +638,10 @@ public class Model {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
-	    int currencyId = findCurrencyId(a.currency);
+	    int currencyId = findCurrencyId(a.currency, userId);
 	    query += "currency = " + currencyId;	    
 	}
-	query += " WHERE name = '" + oldName + "' RETURNING name";
+	query += " WHERE user_id = " + userId + " AND name = '" + oldName + "' RETURNING name";
 	Statement st = conn.createStatement();
 	st.execute(query);
 	ResultSet rs = st.getResultSet();
@@ -596,7 +660,7 @@ public class Model {
     /**
      * Updates a transaction
      */
-    public void patchTransaction(int id, Transaction t) throws Exception, SQLException {
+    public void patchTransaction(int id, Transaction t, int userId) throws Exception, SQLException {
 	String query = "UPDATE transactions SET ";
 	boolean firstStatement = true;
 	if(t.date != null) {
@@ -613,7 +677,7 @@ public class Model {
 	    query += "amount = " + t.amount;
 	}
 	if(t.debit != null) {
-	    int debitId = findAccountId(t.debit);
+	    int debitId = findAccountId(t.debit, userId);
 	    if(!firstStatement) {
 		query += ", ";
 	    }
@@ -623,7 +687,7 @@ public class Model {
 	    query += "debit = " + debitId;
 	}
 	if(t.credit != null) {
-	    int creditId = findAccountId(t.credit);
+	    int creditId = findAccountId(t.credit, userId);
 	    if(!firstStatement) {
 		query += ", ";
 	    }
@@ -638,7 +702,7 @@ public class Model {
 	    }
 	    query += "comment = '" + t.comment + "'";
 	}
-	query += " WHERE id = " + id;
+	query += " WHERE user_id = " + userId + " AND id = " + id;
 	Statement st = conn.createStatement();
 	int rowsUpdated = st.executeUpdate(query);
 	st.close();
@@ -650,8 +714,8 @@ public class Model {
     /**
      * Deletes a currency
      */
-    public void deleteCurrency(String code) throws Exception, SQLException {
-	String query = "DELETE FROM currencies WHERE code = '" + code + "'";
+    public void deleteCurrency(String code, int userId) throws Exception, SQLException {
+	String query = "DELETE FROM currencies WHERE user_id = " + userId + " AND code = '" + code + "'";
 	Statement st = conn.createStatement();
 	int rowsDeleted = st.executeUpdate(query);
 	st.close();
@@ -663,8 +727,8 @@ public class Model {
     /**
      * Deletes an account
      */
-    public void deleteAccount(String name) throws Exception, SQLException {
-	String query = "DELETE FROM accounts WHERE name = '" + name + "'";
+    public void deleteAccount(String name, int userId) throws Exception, SQLException {
+	String query = "DELETE FROM accounts WHERE user_id = " + userId + " AND name = '" + name + "'";
 	Statement st = conn.createStatement();
 	int rowsDeleted = st.executeUpdate(query);
 	st.close();
@@ -676,8 +740,8 @@ public class Model {
     /**
      * Deletes a transaction
      */
-    public void deleteTransaction(int id) throws Exception, SQLException {
-	String query = "DELETE FROM transactions WHERE id = " + id;
+    public void deleteTransaction(int id, int userId) throws Exception, SQLException {
+	String query = "DELETE FROM transactions WHERE user_id = " + userId + " AND id = " + id;
 	Statement st = conn.createStatement();
 	int rowsDeleted = st.executeUpdate(query);
 	st.close();

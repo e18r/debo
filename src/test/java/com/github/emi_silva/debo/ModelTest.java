@@ -67,14 +67,6 @@ public class ModelTest extends TestCase {
     }
 
     /**
-     * Checks an id is found for an existing currency code
-     */
-    public void testFindCurrencyId() throws Exception {
-	model = new Model();
-	assertEquals(model.findCurrencyId("COP"), 5);
-    }
-
-    /**
      * Checks account types are returned correctly
      */
     public void testGetAccountTypes() throws Exception {
