@@ -21,7 +21,8 @@ INSERT INTO debo.account_types (id, name)
 VALUES (1, 'asset'),
        (2, 'liability'),
        (3, 'income'),
-       (4, 'expense');
+       (4, 'expense'),
+       (5, 'equity');
 
 CREATE TABLE debo.users (
        id SERIAL PRIMARY KEY,
@@ -69,26 +70,28 @@ INSERT INTO debo.accounts (user_id, name, currency, type)
 VALUES (1, 'Bancolombia', 5, 1),
        (1, 'wallet', 5, 1),
        (1, 'Samourai', 6, 1),
-       (1, 'restaurant', 5, 4);
+       (1, 'restaurant', 5, 4),
+       (1, 'COP equity', 5, 5),
+       (1, 'BTC equity', 6, 5);
 
 CREATE TABLE debo.transactions (
        id SERIAL PRIMARY KEY,
        user_id INT NOT NULL REFERENCES debo.users,
        date TIMESTAMP (0) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
        amount NUMERIC NOT NULL,
-       debit INT REFERENCES debo.accounts,
-       credit INT REFERENCES debo.accounts,
+       debit INT NOT NULL REFERENCES debo.accounts,
+       credit INT NOT NULL REFERENCES debo.accounts,
        comment TEXT,
        CONSTRAINT not_both_null CHECK (debit IS NOT NULL OR credit IS NOT NULL)
 );
 
 INSERT INTO debo.transactions (user_id, amount, debit, credit, comment)
-VALUES (1, 35450, 1, NULL, 'initial balance'),
-       (1, 22000, 2, NULL, 'initial balance'),
-       (1, 0.58374957, 3, NULL, 'initial balance'),
+VALUES (1, 35450, 1, 5, 'initial balance'),
+       (1, 22000, 2, 5, 'initial balance'),
+       (1, 0.58374957, 3, 6, 'initial balance'),
        (1, 12000, 4, 2, 'McDonalds with friends'),
        (1, 600000, 2, 1, 'took some bucks out of the ATM'),
        (1, 35550, 4, 2, NULL),
        (1, 100000, 1, 2, 'I deposited some money in my bank account'),
        (1, 10000, 2, 4, 'Got a refund from the restaurant'),
-       (1, 123450, NULL, 4, 'the restaurant had refunded me in the past');
+       (1, 123450, 5, 4, 'the restaurant had refunded me in the past');
