@@ -15,8 +15,8 @@ import java.lang.Exception;
 import java.math.BigDecimal;
 
 
-// TODO: Sanitize queries to prevent SQL injection
-// TODO: Put closing statements in finally blocks to tackle DoS attacks
+// TODO (critical): Sanitize queries to prevent SQL injection
+// TODO (critical): Put closing statements in finally blocks to tackle DoS attacks
 
 public class Model {
 
@@ -239,11 +239,10 @@ public class Model {
     /**
      * Creates an account
      */
-    public String postAccounts(Account a, int userId) throws Exception, SQLException {
-	int currencyId = findCurrencyId(a.currency, userId);
+    public String postAccounts(Account a, int userId) throws Exception, SQLException {       
 	int typeId = findAccountTypeId(a.type);
-	String query = "INSERT INTO accounts (user_id, name, currency, type) "
-	    + "VALUES (" + userId + ", '" + a.name + "', " + currencyId + ", " + typeId + ")"
+	String query = "INSERT INTO accounts (user_id, name, type) "
+	    + "VALUES (" + userId + ", '" + a.name + "', " + typeId + ")"
 	    + "RETURNING name";
 	Statement st = conn.createStatement();
 	st.execute(query);
@@ -259,13 +258,14 @@ public class Model {
      * Creates a transaction
      */
     public int postTransactions(Transaction t, int userId) throws Exception, SQLException {
+	int currencyId = findCurrencyId(t.currency, userId);
 	int debitId = findAccountId(t.debit, userId);
 	int creditId = findAccountId(t.credit, userId);
 	String query = "INSERT INTO transactions (user_id, ";
 	if(t.date != null) {
 	    query += "date, ";
 	}
-	query += "amount, debit, credit";
+	query += "amount, currency, debit, credit";
 	if(t.comment != null) {
 	    query += ", comment";
 	}
@@ -273,7 +273,7 @@ public class Model {
 	if(t.date != null) {
 	    query += "TIMESTAMP WITH TIME ZONE '" + t.date + "', ";
 	}
-	query += t.amount.toPlainString() + ", " + debitId + ", " + creditId;
+	query += t.amount.toPlainString() + ", " + currencyId + ", " + debitId + ", " + creditId;
 	if(t.comment != null) {
 	    query += ", '" + t.comment + "'";
 	}
@@ -326,25 +326,12 @@ public class Model {
      */
     public ArrayList<Account> getAccounts(Account filter, int userId) {
 	ArrayList<Account> accounts = new ArrayList<Account>();
-	String query = "SELECT accounts.id, account_types.name, accounts.name, "
-	    + "currencies.code "
+	String query = "SELECT accounts.id, account_types.name, accounts.name "
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
-	    + "JOIN currencies on accounts.currency = currencies.id "
 	    + "WHERE accounts.user_id = " + userId;
-	if(filter.type != null || filter.currency != null) {
-	    boolean firstCondition = true;
-	    query += " AND ";
-	    if(filter.type != null) {
-		firstCondition = false;
-		query += "account_types.name = '" + filter.type + "'";
-	    }
-	    if(filter.currency != null) {
-		if(!firstCondition) {
-		    query += " AND ";
-		}
-		query += "currencies.code = '" + filter.currency + "'";
-	    }
+	if(filter.type != null) {
+	    query += " AND account_types.name = '" + filter.type + "'";
 	}
 	try {
 	    Statement st = conn.createStatement();
@@ -354,7 +341,6 @@ public class Model {
 		a.id = rs.getInt(1);
 		a.type = rs.getString(2);
 		a.name = rs.getString(3);
-		a.currency = rs.getString(4);
 		accounts.add(a);
 	    }
 	    rs.close();
@@ -371,16 +357,16 @@ public class Model {
      */
     public ArrayList<Transaction> getTransactions(TxFilter f, int userId) {
 	ArrayList<Transaction> transactions = new ArrayList<Transaction>();
-	String query = "SELECT t.id, t.date, t.amount, coalesce(c_debit.code, c_credit.code), "
-	    + "a_debit.name, a_credit.name, t.comment "
+	String query = "SELECT t.id, t.date, t.amount, c.code, a_debit.name, a_credit.name, "
+	    + "t.comment "
 	    + "FROM transactions t "
-	    + "LEFT JOIN accounts a_debit ON t.debit = a_debit.id "
-	    + "LEFT JOIN accounts a_credit ON t.credit = a_credit.id "
-	    + "LEFT JOIN currencies c_debit ON a_debit.currency = c_debit.id "
-	    + "LEFT JOIN currencies c_credit ON a_credit.currency = c_credit.id "
+	    + "JOIN accounts a_debit ON t.debit = a_debit.id "
+	    + "JOIN accounts a_credit ON t.credit = a_credit.id "
+	    + "JOIN currencies c ON t.currency = c.id "
 	    + "WHERE t.user_id = " + userId;
 	if(f.minDate != null || f.maxDate != null || f.minAmount != null || f.maxAmount != null
-	   || f.debit != null || f.credit != null || f.account != null || f.commentHas != null) {
+	   || f.currency != null || f.debit != null || f.credit != null || f.account != null
+	   || f.commentHas != null) {
 	    boolean firstCondition = true;
 	    query += " AND ";
 	    if(f.minDate != null) {
@@ -414,6 +400,15 @@ public class Model {
 		}
 		query += "amount < " + f.maxAmount;
 	    }
+	    if(f.currency != null) {
+		if(!firstCondition) {
+		    query += " AND ";
+		}
+		else {
+		    firstCondition = false;
+		}
+		query += "c.code = '" + f.currency + "'";
+	    }
 	    if(f.debit != null) {
 		if(!firstCondition) {
 		    query += " AND ";
@@ -421,7 +416,7 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "debit = '" + f.debit + "'";
+		query += "a_debit.name = '" + f.debit + "'";
 	    }
 	    if(f.credit != null) {
 		if(!firstCondition) {
@@ -430,7 +425,7 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "credit = '" + f.credit + "'";
+		query += "a_credit.name = '" + f.credit + "'";
 	    }
 	    if(f.account != null) {
 		if(!firstCondition) {
@@ -439,7 +434,8 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "(credit = '" + f.account + "' OR debit = '" + f.account + "')";
+		query += "(a_debit.name = '" + f.account
+		    + "' OR a_credit.name = '" + f.account + "')";
 	    }
 	    if(f.commentHas != null) {
 		String pattern = f.commentHas.replace(" ", ".*");
@@ -508,11 +504,9 @@ public class Model {
      */
     public Account getAccount(String name, int userId) {
 	Account a = new Account();
-	String query = "SELECT accounts.id, account_types.name, accounts.name, "
-	    + "currencies.code "
+	String query = "SELECT accounts.id, account_types.name, accounts.name "
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
-	    + "JOIN currencies ON accounts.currency = currencies.id "
 	    + "WHERE accounts.user_id = " + userId + " AND accounts.name = '" + name + "'";
 	try {
 	    Statement st = conn.createStatement();
@@ -521,7 +515,6 @@ public class Model {
 		a.id = rs.getInt(1);
 		a.type = rs.getString(2);
 		a.name = rs.getString(3);
-		a.currency = rs.getString(4);
 	    }
 	    else {
 		a = null;
@@ -540,13 +533,12 @@ public class Model {
      */
     public Transaction getTransaction(int id, int userId) {
 	Transaction t = new Transaction();
-	String query = "SELECT t.id, t.date, t.amount, coalesce(c_debit.code, c_credit.code), "
-	    + "a_debit.name, a_credit.name, t.comment "
+	String query = "SELECT t.id, t.date, t.amount, c.code, a_debit.name, "
+	    + "a_credit.name, t.comment "
 	    + "FROM transactions t "
-	    + "LEFT JOIN accounts a_debit ON t.debit = a_debit.id "
-	    + "LEFT JOIN accounts a_credit ON t.credit = a_credit.id "
-	    + "LEFT JOIN currencies c_debit ON a_debit.currency = c_debit.id "
-	    + "LEFT JOIN currencies c_credit ON a_credit.currency = c_credit.id "
+	    + "JOIN accounts a_debit ON t.debit = a_debit.id "
+	    + "JOIN accounts a_credit ON t.credit = a_credit.id "
+	    + "JOIN currencies c ON t.currency = c.id "
 	    + "WHERE t.user_id = " + userId + " AND t.id = " + id;
 	try {
 	    Statement st = conn.createStatement();
@@ -629,17 +621,7 @@ public class Model {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
-	    else {
-		firstStatement = false;
-	    }
 	    query += "name = '" + a.name + "'";
-	}
-	if(a.currency != null) {
-	    if(!firstStatement) {
-		query += ", ";
-	    }
-	    int currencyId = findCurrencyId(a.currency, userId);
-	    query += "currency = " + currencyId;	    
 	}
 	query += " WHERE user_id = " + userId + " AND name = '" + oldName + "' RETURNING name";
 	Statement st = conn.createStatement();
@@ -676,24 +658,34 @@ public class Model {
 	    }
 	    query += "amount = " + t.amount;
 	}
-	if(t.debit != null) {
-	    int debitId = findAccountId(t.debit, userId);
+	if(t.currency != null) {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
 	    else {
 		firstStatement = false;
 	    }
+	    int currencyId = findCurrencyId(t.currency, userId);
+	    query += "currency = " + currencyId;
+	}
+	if(t.debit != null) {
+	    if(!firstStatement) {
+		query += ", ";
+	    }
+	    else {
+		firstStatement = false;
+	    }
+	    int debitId = findAccountId(t.debit, userId);
 	    query += "debit = " + debitId;
 	}
 	if(t.credit != null) {
-	    int creditId = findAccountId(t.credit, userId);
 	    if(!firstStatement) {
 		query += ", ";
 	    }
 	    else {
 		firstStatement = false;
 	    }
+	    int creditId = findAccountId(t.credit, userId);
 	    query += "credit = " + creditId;
 	}
 	if(t.comment != null) {
@@ -783,10 +775,9 @@ public class Model {
 	public int id;
 	public String type;
 	public String name;
-	public String currency;
 	Account() {}
 	public String toString() {
-	    return "<" + type + "> " + name + " (" + currency + ")";
+	    return "<" + type + "> " + name;
 	}
     }
 
@@ -795,13 +786,14 @@ public class Model {
 	public String maxDate;
 	public BigDecimal minAmount;
 	public BigDecimal maxAmount;
+	public String currency;
 	public String debit;
 	public String credit;
 	public String account;
 	public String commentHas;
 	TxFilter() {}
 	public String toString() {
-	    return "\"" + commentHas + "\" (" + debit + ":" + credit + ") $" + minAmount + " - " + maxAmount + "$ <" + minDate + " - " + maxDate + ">";
+	    return "\"" + commentHas + "\" (" + debit + ":" + credit + ") " + currency + " $" + minAmount + " - " + maxAmount + "$ <" + minDate + " - " + maxDate + ">";
 	}
     }
 

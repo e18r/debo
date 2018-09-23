@@ -140,25 +140,17 @@ public class Logic {
 	if(a.name == null) {
 	    throw new Exception("Please specify an account name.");
 	}
-	if(a.currency == null) {
-	    throw new Exception("Please specify a currency code.");
-	}
 	String newName = model.postAccounts(a, userId);
 	Model.Account newAccount = model.getAccount(newName, userId);
 	return newAccount;
-    }
-
-    private void checkCurrencies(String debit, String credit, int userId) throws Exception {
-	Model.Account debitAccount = model.getAccount(debit, userId);
-	Model.Account creditAccount = model.getAccount(credit, userId);
-	if(!debitAccount.currency.equals(creditAccount.currency)) {
-	    throw new Exception("Currency mismatch.");
-	}
     }
     
     public Model.Transaction postTransactions(Model.Transaction t, int userId) throws Exception {
 	if(t.amount == null) {
 	    throw new Exception("Please specify an amount.");
+	}
+	if(t.currency == null) {
+	    throw new Exception("Please specify a currency code.");
 	}
 	if(t.debit == null) {
 	    throw new Exception("Please specify the name of the account to debit from.");
@@ -166,7 +158,6 @@ public class Logic {
 	if(t.credit == null) {
 	    throw new Exception("Please specify the name of the account to credit from.");
 	}
-	checkCurrencies(t.debit, t.credit, userId);
 	int newId = model.postTransactions(t, userId);
 	Model.Transaction newTx = model.getTransaction(newId, userId);
 	return newTx;
@@ -213,7 +204,7 @@ public class Logic {
 	return model.getCurrency(newCode, userId);
     }
     public Model.Account patchAccount(String oldName, Model.Account a, int userId) throws Exception {
-	if(a.type == null && a.name == null && a.currency == null) {
+	if(a.type == null && a.name == null) {
 	    throw new Exception("Please specify at least one field to patch.");
 	}
 	String newName = model.patchAccount(oldName, a, userId);
@@ -222,26 +213,10 @@ public class Logic {
     public Model.Transaction patchTransaction(String idString, Model.Transaction t, int userId) throws Exception {
 	int id;
 	id = Integer.valueOf(idString);
-	if(t.date == null && t.amount == null && t.debit == null && t.credit == null
-	   && t.comment == null) {
+	if(t.date == null && t.amount == null && t.currency == null
+	   && t.debit == null && t.credit == null && t.comment == null) {
 	    throw new Exception("Please specify at least one field to patch.");
 	}
-	Model.Transaction oldTx = model.getTransaction(id, userId);
-	String debit;
-	if(t.debit != null) {
-	    debit = t.debit;
-	}
-	else {
-	    debit = oldTx.debit;
-	}
-	String credit;
-	if(t.credit != null) {
-	    credit = t.credit;
-	}
-	else {
-	    credit = oldTx.credit;
-	}
-	checkCurrencies(debit, credit, userId);
 	model.patchTransaction(id, t, userId);
 	return model.getTransaction(id, userId);
     }

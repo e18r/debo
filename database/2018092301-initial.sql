@@ -61,37 +61,36 @@ CREATE TABLE debo.accounts (
        id SERIAL PRIMARY KEY,
        user_id INT NOT NULL REFERENCES debo.users,
        name VARCHAR NOT NULL,
-       currency INT NOT NULL REFERENCES debo.currencies,
        type INT NOT NULL REFERENCES debo.account_types,
        CONSTRAINT name_uniqueness UNIQUE (name, user_id)
 );
 
-INSERT INTO debo.accounts (user_id, name, currency, type)
-VALUES (1, 'Bancolombia', 5, 1),
-       (1, 'wallet', 5, 1),
-       (1, 'Samourai', 6, 1),
-       (1, 'restaurant', 5, 4),
-       (1, 'COP equity', 5, 5),
-       (1, 'BTC equity', 6, 5);
+INSERT INTO debo.accounts (user_id, name, type)
+VALUES (1, 'Bancolombia', 1),
+       (1, 'wallet', 1),
+       (1, 'Samourai', 1),
+       (1, 'restaurant', 4),
+       (1, 'COP equity', 5),
+       (1, 'BTC equity', 5);
 
 CREATE TABLE debo.transactions (
        id SERIAL PRIMARY KEY,
        user_id INT NOT NULL REFERENCES debo.users,
        date TIMESTAMP (0) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
        amount NUMERIC NOT NULL,
+       currency INT NOT NULL REFERENCES debo.currencies,
        debit INT NOT NULL REFERENCES debo.accounts,
        credit INT NOT NULL REFERENCES debo.accounts,
-       comment TEXT,
-       CONSTRAINT not_both_null CHECK (debit IS NOT NULL OR credit IS NOT NULL)
+       comment TEXT
 );
 
-INSERT INTO debo.transactions (user_id, amount, debit, credit, comment)
-VALUES (1, 35450, 1, 5, 'initial balance'),
-       (1, 22000, 2, 5, 'initial balance'),
-       (1, 0.58374957, 3, 6, 'initial balance'),
-       (1, 12000, 4, 2, 'McDonalds with friends'),
-       (1, 600000, 2, 1, 'took some bucks out of the ATM'),
-       (1, 35550, 4, 2, NULL),
-       (1, 100000, 1, 2, 'I deposited some money in my bank account'),
-       (1, 10000, 2, 4, 'Got a refund from the restaurant'),
-       (1, 123450, 5, 4, 'the restaurant had refunded me in the past');
+INSERT INTO debo.transactions (user_id, amount, currency, debit, credit, comment)
+VALUES (1, 35450, 5, 1, 5, 'initial balance'),
+       (1, 22000, 5, 2, 5, 'initial balance'),
+       (1, 0.58374957, 6, 3, 6, 'initial balance'),
+       (1, 12000, 5, 4, 2, 'McDonalds with friends'),
+       (1, 600000, 5, 2, 1, 'took some bucks out of the ATM'),
+       (1, 35550, 5, 4, 2, NULL),
+       (1, 100000, 5, 1, 2, 'I deposited some money in my bank account'),
+       (1, 10000, 5, 2, 4, 'Got a refund from the restaurant'),
+       (1, 123450, 5, 5, 4, 'the restaurant had refunded me in the past');
