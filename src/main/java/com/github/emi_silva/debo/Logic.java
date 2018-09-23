@@ -111,6 +111,14 @@ public class Logic {
 	return model.authenticate(sessionToken);
     }
 
+    public ArrayList<Model.CurrencyType> getCurrencyTypes() {
+	return model.getCurrencyTypes();
+    }
+
+    public ArrayList<Model.AccountType> getAccountTypes() {
+	return model.getAccountTypes();
+    }
+
     public Model.Currency postCurrencies(Model.Currency c, int userId) throws Exception {
 	if(c.code == null) {
 	    throw new Exception("Please specify a currency code");

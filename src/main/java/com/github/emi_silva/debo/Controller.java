@@ -43,6 +43,26 @@ public class Controller {
 		}
 	    });
 
+	On.get("/currency_types").json((Req req) -> {
+		try {
+		    authenticate(req);
+		}
+		catch(Exception e) {
+		    return login(req);
+		}
+		return U.list(logic.getCurrencyTypes());
+	    });
+
+ 	On.get("/account_types").json((Req req) -> {
+		try {
+		    authenticate(req);
+		}
+		catch(Exception e) {
+		    return login(req);
+		}
+		return U.list(logic.getAccountTypes());
+	    });
+
 	On.post("/currencies").json((Model.Currency c, Req req) -> {
 		int userId;
 		try {
