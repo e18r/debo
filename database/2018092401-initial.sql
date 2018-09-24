@@ -81,7 +81,8 @@ CREATE TABLE debo.transactions (
        currency INT NOT NULL REFERENCES debo.currencies,
        debit INT NOT NULL REFERENCES debo.accounts,
        credit INT NOT NULL REFERENCES debo.accounts,
-       comment TEXT
+       comment TEXT,
+       CONSTRAINT debit_not_credit CHECK (debit != credit)
 );
 
 INSERT INTO debo.transactions (user_id, amount, currency, debit, credit, comment)
