@@ -11,8 +11,7 @@ public class Controller {
 
     private static int authenticate(Req req) throws Exception {
 	String authHeader = req.header("Authorization");
-	String sessionToken = authHeader.split(" ")[1];
-	int userId = logic.authenticate(sessionToken);
+	int userId = logic.authenticate(authHeader);
 	return userId;
     }
 
@@ -23,6 +22,16 @@ public class Controller {
     public static void main(String[] args)
     {
 	logic = new Logic();
+
+	On.req(req -> {
+		try {
+		    authenticate(req);
+		}
+		catch(Exception e) {
+		    return req.response().result("").code(401);
+		}
+		return null;
+	    });
 
 	On.get("/login").json((Req req) -> {
 		String redirectUri = logic.getOAuthUri();

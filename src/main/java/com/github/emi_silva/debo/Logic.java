@@ -72,7 +72,7 @@ public class Logic {
 	String APIEndpoint = authProps.getProperty("APIEndpoint");
 	String alt = authProps.getProperty("alt");
 	String Uri = APIEndpoint + "?alt=" + alt;
-	String authHeader = authProps.getProperty("authHeader") + " " + accessToken;
+	String authHeader = authProps.getProperty("authKeyword") + " " + accessToken;
 	HttpResponse<JsonNode> response = Unirest.get(Uri)
 	    .header("Authorization", authHeader)
 	    .asJson();
@@ -108,8 +108,15 @@ public class Logic {
 	return sessionToken;
     }
 
-    public int authenticate(String sessionToken) throws Exception {
-	return model.authenticate(sessionToken);
+    public int authenticate(String authHeader) throws Exception {
+	String[] authElems = authHeader.split(" ");
+	String authKeyword = authElems[0];
+	if(!authKeyword.equals(authProps.getProperty("authKeyword"))) {
+	    throw new Exception("Invalid auth keyword.");
+	}
+	String sessionToken = authElems[1];
+	int userId = model.authenticate(sessionToken);
+	return userId;
     }
 
     public ArrayList<Model.CurrencyType> getCurrencyTypes() {
