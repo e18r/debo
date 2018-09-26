@@ -36,24 +36,31 @@ public class Model {
     }
 
     /**
-     * Reads properties from a file
-     * @param relPath the relative path of the file starting from
-     * src/main/resources
+     * Reads properties from a file, using a defaults file as fallback
+     * @param relPath the relative path of the file starting from src/main/resources
      * @return the Properties object
      */
     Properties readProps(String relPath) {
+	String defaultExt = ".default";
 	Properties props = new Properties();
+	URL defaultLocation = this.getClass().getResource(relPath + defaultExt);
 	URL location = this.getClass().getResource(relPath);
 	try {
+	    FileReader defaultFile = new FileReader(defaultLocation.getPath());
+	    props.load(defaultFile);
+	    defaultFile.close();
 	    FileReader file = new FileReader(location.getPath());
 	    props.load(file);
 	    file.close();
 	}
 	catch (FileNotFoundException e) {
-	    System.out.println(e);
+	    System.out.println(e.getMessage());
 	}
 	catch (IOException e) {
-	    System.out.println(e);
+	    System.out.println(e.getMessage());
+	}
+	catch(NullPointerException e) {
+	    System.out.println(e.getMessage());
 	}
 	return props;
     }

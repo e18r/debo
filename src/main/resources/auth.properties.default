@@ -1,0 +1,28 @@
+#
+# auth.properties.default
+# Properties file related to debo's auth mechanism
+# Copy this file to auth.properties and make the necessary changes
+#
+
+# ID of your Google Project (https://console.developers.google.com/)
+clientId=920924587623-n2s5sc25joh4ffm058fv90l60oel88j5.apps.googleusercontent.com
+
+# Password of your Google Project
+clientSecret=0LbTuEGKYKyHLwTaE6JZqTxM
+
+# Redirect URI. It's your project's URI + "/redirect"
+redirectUri=http://www.example.com/redirect
+
+# Random Seed
+seed=XEDmK3EY6pitcza4Eon51xVBKfw8YnOOidOYjxlSIIU89F3OcQZ8xv5eqZqKhxGP
+
+# The following should probably be left untouched
+oauthEndpoint=https://accounts.google.com/o/oauth2/v2/auth
+scope=email
+responseType=code
+accessTokenEndpoint=https://www.googleapis.com/oauth2/v4/token
+contentHeader=application/x-www-form-urlencoded
+grantType=authorization_code
+APIEndpoint=https://www.googleapis.com/oauth2/v1/userinfo
+alt=json
+authKeyword=Bearer

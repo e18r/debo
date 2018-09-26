@@ -1,0 +1,15 @@
+#
+# db.properties.default
+# Properties file related to debo's database access
+# Copy this file to db.properties and make the necessary changes.
+#
+
+# Database username
+user=debo
+
+# Database password
+password=BxVn5g5VmNP16kS89CqawmtJboCnau7F
+
+# The following should probably be left untouched
+currentSchema=debo
+stringtype=unspecified
