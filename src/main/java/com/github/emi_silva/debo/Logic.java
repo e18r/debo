@@ -26,8 +26,7 @@ public class Logic {
     }
 
     /**
-     * Builds the Google OAuth URI the client is redirected to for authorization
-     * TODO: state (for added security or to store what the user was doing)
+     * Builds the Google OAuth URI the client will be redirected to for authorization
      */
     public String getOAuthUri() {
 	String OAuthEndpoint = authProps.getProperty("oauthEndpoint");
@@ -35,16 +34,15 @@ public class Logic {
 	String redirectUri = authProps.getProperty("redirectUri");
 	String scope = authProps.getProperty("scope");
 	String responseType = authProps.getProperty("responseType");
-	String state = "state"; // TODO
 	String uri = OAuthEndpoint + "?client_id=" + clientId + "&redirect_uri=" + redirectUri
-	    + "&scope=" + scope + "&response_type=" + responseType + "&state=" + state;
+	    + "&scope=" + scope + "&response_type=" + responseType;
 	return uri;
     }
 
     /**
      * Given a code provider by the authenticated user, gets an access token
      */
-    public String getAccessToken(String code) throws UnirestException {
+    public String getAccessToken(String code) throws Exception, UnirestException {
 	String accessTokenEndpoint = authProps.getProperty("accessTokenEndpoint");
 	String contentHeader = authProps.getProperty("contentHeader");
 	String clientId = authProps.getProperty("clientId");
@@ -60,6 +58,9 @@ public class Logic {
 	    .field("grantType", grantType)
 	    .asJson();
 	JSONObject body = new JSONObject(response.getBody().toString());
+	if(body.has("error")) {
+	    throw new Exception(body.getString("error"));
+	}
 	String accessToken = body.getString("access_token");
 	return accessToken;
     }
@@ -210,9 +211,9 @@ public class Logic {
 	String newName = model.patchAccount(oldName, a, userId);
 	return model.getAccount(newName, userId);
     }
-    public Model.Transaction patchTransaction(String idString, Model.Transaction t, int userId) throws Exception {
+    public Model.Transaction patchTransaction(String refId, Model.Transaction t, int userId) throws Exception {
 	int id;
-	id = Integer.valueOf(idString);
+	id = Integer.valueOf(refId);
 	if(t.date == null && t.amount == null && t.currency == null
 	   && t.debit == null && t.credit == null && t.comment == null) {
 	    throw new Exception("Please specify at least one field to patch.");

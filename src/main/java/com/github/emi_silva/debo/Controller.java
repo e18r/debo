@@ -16,11 +16,6 @@ public class Controller {
 	return userId;
     }
 
-    private static Resp login(Req req) {
-	String redirectUri = logic.getOAuthUri();
-	return req.response().redirect(redirectUri);
-    }
-
     private static Resp handleException(Exception e, Req req) {
 	return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
     }
@@ -29,7 +24,10 @@ public class Controller {
     {
 	logic = new Logic();
 
-	On.get("/login").json((Req req) -> login(req));
+	On.get("/login").json((Req req) -> {
+		String redirectUri = logic.getOAuthUri();
+		return req.response().redirect(redirectUri);
+	    });
 
 	On.get("/redirect").json((String code, Req req) -> {
 		try {
@@ -48,7 +46,7 @@ public class Controller {
 		    authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return U.list(logic.getCurrencyTypes());
 	    });
@@ -58,7 +56,7 @@ public class Controller {
 		    authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return U.list(logic.getAccountTypes());
 	    });
@@ -69,7 +67,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    Model.Currency newCurrency = logic.postCurrencies(c, userId);
@@ -85,7 +83,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    Model.Account newAccount = logic.postAccounts(a, userId);
@@ -101,7 +99,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    Model.Transaction newTx = logic.postTransactions(t, userId);
@@ -118,7 +116,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return U.list(logic.getCurrencies(c, userId));
 	    });
@@ -128,7 +126,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return U.list(logic.getAccounts(a, userId));
 	    });
@@ -138,7 +136,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return U.list(logic.getTransactions(t, userId));
 	    });
@@ -149,7 +147,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return logic.getCurrency(code, userId);
 	    });
@@ -159,7 +157,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return logic.getAccount(name, userId);
 	    });
@@ -169,7 +167,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		return logic.getTransaction(id, userId);
 	    });
@@ -180,7 +178,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    return logic.patchCurrency(oldCode, c, userId);
@@ -195,7 +193,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    return logic.patchAccount(oldName, a, userId);
@@ -205,16 +203,16 @@ public class Controller {
 
 		}
 	    });
-	On.patch("/transaction/{id}").json((String id, Model.Transaction t, Req req) -> {
+	On.patch("/transaction/{refId}").json((String refId, Model.Transaction t, Req req) -> {
 		int userId;
 		try {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
-		    return logic.patchTransaction(id, t, userId);
+		    return logic.patchTransaction(refId, t, userId);
 		}
 		catch(Exception e) {
 		    return handleException(e, req);
@@ -227,7 +225,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    logic.deleteCurrency(code, userId);
@@ -243,7 +241,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    logic.deleteAccount(name, userId);
@@ -259,7 +257,7 @@ public class Controller {
 		    userId = authenticate(req);
 		}
 		catch(Exception e) {
-		    return login(req);
+		    return req.response().result("").code(401);
 		}
 		try {
 		    logic.deleteTransaction(id, userId);
