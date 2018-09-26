@@ -1,0 +1,4 @@
+tls:
+  enabled: true
+  selfSigned: true
+  keystore: 'test-keystore'

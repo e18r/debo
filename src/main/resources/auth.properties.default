@@ -11,7 +11,7 @@ clientId=920924587623-n2s5sc25joh4ffm058fv90l60oel88j5.apps.googleusercontent.co
 clientSecret=0LbTuEGKYKyHLwTaE6JZqTxM
 
 # Redirect URI. It's your project's URI + "/redirect"
-redirectUri=http://www.example.com/redirect
+redirectUri=https://www.example.com/redirect
 
 # Random Seed
 seed=XEDmK3EY6pitcza4Eon51xVBKfw8YnOOidOYjxlSIIU89F3OcQZ8xv5eqZqKhxGP
