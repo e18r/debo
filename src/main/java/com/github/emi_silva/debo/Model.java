@@ -9,13 +9,12 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.sql.Statement;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.lang.Exception;
 import java.math.BigDecimal;
 
 
-// TODO (critical): Sanitize queries to prevent SQL injection
 // TODO (critical): Put closing statements in finally blocks to tackle DoS attacks
 
 public class Model {
@@ -63,10 +62,11 @@ public class Model {
      * Creates a new user
      */
     public void newUser(String email, String sessionToken) throws Exception {
-	String query = "INSERT INTO users (email, session_token) "
-	    + "VALUES ('" + email + "', '"+ sessionToken +"')";
-	Statement st = conn.createStatement();
-	int rowsInserted = st.executeUpdate(query);
+	String query = "INSERT INTO users (email, session_token) VALUES (?, ?)";
+	PreparedStatement st = conn.prepareStatement(query);
+	st.setString(1, email);
+	st.setString(2, sessionToken);
+	int rowsInserted = st.executeUpdate();
 	if(rowsInserted != 1) {
 	    throw new Exception("There was an error creating the user.");
 	}
@@ -78,11 +78,11 @@ public class Model {
      */
     public String getSessionToken(String email) throws Exception {
 	String sessionToken;
-	String query = "SELECT session_token FROM users "
-	    + "WHERE email = '" + email + "'";
+	String query = "SELECT session_token FROM users WHERE email = ?";
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setString(1, email);
+	    ResultSet rs = st.executeQuery();
 	    if(rs.next()) {
 		sessionToken = rs.getString(1);
 	    }
@@ -103,9 +103,10 @@ public class Model {
      * Authenticates a user
      */
     public int authenticate(String sessionToken) throws Exception {
-	String query = "SELECT id FROM users WHERE session_token = '" + sessionToken + "'";
-	Statement st = conn.createStatement();
-	ResultSet rs = st.executeQuery(query);
+	String query = "SELECT id FROM users WHERE session_token = ?";
+	PreparedStatement st = conn.prepareStatement(query);
+	st.setString(1, sessionToken);
+	ResultSet rs = st.executeQuery();
 	if(rs.next()) {
 	    int userId = rs.getInt(1);
 	    rs.close();
@@ -126,8 +127,8 @@ public class Model {
 	ArrayList<CurrencyType> cts = new ArrayList<CurrencyType>();
 	String query = "SELECT id, name FROM currency_types";
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    ResultSet rs = st.executeQuery();
 	    while(rs.next()) {
 		CurrencyType ct = new CurrencyType();
 		ct.id = rs.getInt(1);
@@ -150,8 +151,8 @@ public class Model {
 	ArrayList<AccountType> ats = new ArrayList<AccountType>();
 	String query = "SELECT id, name FROM account_types";
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    ResultSet rs = st.executeQuery();
 	    while(rs.next()) {
 		AccountType at = new AccountType();
 		at.id = rs.getInt(1);
@@ -224,10 +225,13 @@ public class Model {
     public String postCurrencies(Currency c, int userId) throws Exception, SQLException {
 	int type = findCurrencyTypeId(c.type);
 	String query = "INSERT INTO currencies (user_id, code, name, type) "
-	    + "VALUES (" + userId + ", '" + c.code + "', '" + c.name + "', " + type + ")"
-	    + "RETURNING code";
-	Statement st = conn.createStatement();
-	st.execute(query);
+	    + "VALUES (?, ?, ?, ?) RETURNING code";
+	PreparedStatement st = conn.prepareStatement(query);
+	st.setInt(1, userId);
+	st.setString(2, c.code);
+	st.setString(3, c.name);
+	st.setInt(4, type);
+	st.execute();
 	ResultSet rs = st.getResultSet();
 	rs.next();
 	String code = rs.getString(1);
@@ -242,10 +246,12 @@ public class Model {
     public String postAccounts(Account a, int userId) throws Exception, SQLException {       
 	int typeId = findAccountTypeId(a.type);
 	String query = "INSERT INTO accounts (user_id, name, type) "
-	    + "VALUES (" + userId + ", '" + a.name + "', " + typeId + ")"
-	    + "RETURNING name";
-	Statement st = conn.createStatement();
-	st.execute(query);
+	    + "VALUES (?, ?, ?) RETURNING name";
+	PreparedStatement st = conn.prepareStatement(query);
+	st.setInt(1, userId);
+	st.setString(2, a.name);
+	st.setInt(3, typeId);
+	st.execute();
 	ResultSet rs = st.getResultSet();
 	rs.next();
 	String name = rs.getString(1);
@@ -261,25 +267,37 @@ public class Model {
 	int currencyId = findCurrencyId(t.currency, userId);
 	int debitId = findAccountId(t.debit, userId);
 	int creditId = findAccountId(t.credit, userId);
+	int optionalFields = 0;
 	String query = "INSERT INTO transactions (user_id, ";
 	if(t.date != null) {
 	    query += "date, ";
+	    optionalFields ++;
 	}
 	query += "amount, currency, debit, credit";
 	if(t.comment != null) {
 	    query += ", comment";
+	    optionalFields ++;
 	}
-	query += ") VALUES (" + userId + ", ";
-	if(t.date != null) {
-	    query += "TIMESTAMP WITH TIME ZONE '" + t.date + "', ";
-	}
-	query += t.amount.toPlainString() + ", " + currencyId + ", " + debitId + ", " + creditId;
-	if(t.comment != null) {
-	    query += ", '" + t.comment + "'";
+	query += ") VALUES (?, ?, ?, ?, ?";
+	for(int i = 0; i < optionalFields; i ++) {
+	    query += ", ?";
 	}
 	query += ") RETURNING id";
-	Statement st = conn.createStatement();
-	st.execute(query);
+	PreparedStatement st = conn.prepareStatement(query);
+	int offset = 0;
+	st.setInt(1, userId);
+	if(t.date != null) {
+	    st.setString(2, t.date);
+	    offset = 1;
+	}
+	st.setBigDecimal(2 + offset, t.amount);
+	st.setInt(3 + offset, currencyId);
+	st.setInt(4 + offset, debitId);
+	st.setInt(5 + offset, creditId);
+	if(t.comment != null) {
+	    st.setString(6 + offset, t.comment);
+	}
+	st.execute();
 	ResultSet rs = st.getResultSet();
 	rs.next();
 	int id = rs.getInt(1);
@@ -297,13 +315,17 @@ public class Model {
 	    + "currency_types.name "
 	    + "FROM currencies "
 	    + "JOIN currency_types ON currencies.type = currency_types.id "
-	    + "WHERE user_id = " + userId;
+	    + "WHERE user_id = ?";
 	if(filter.type != null) {
-	    query += " AND currency_types.name = '" + filter.type + "'";
+	    query += " AND currency_types.name = ?";
 	}
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    if(filter.type != null) {
+		st.setString(2, filter.type);
+	    }
+	    ResultSet rs = st.executeQuery();
 	    while(rs.next()) {
 		Currency c = new Currency();
 		c.id = rs.getInt(1);
@@ -329,13 +351,17 @@ public class Model {
 	String query = "SELECT accounts.id, account_types.name, accounts.name "
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
-	    + "WHERE accounts.user_id = " + userId;
+	    + "WHERE accounts.user_id = ?";
 	if(filter.type != null) {
-	    query += " AND account_types.name = '" + filter.type + "'";
+	    query += " AND account_types.name = ?";
 	}
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    if(filter.type != null) {
+		st.setString(2, filter.type);
+	    }
+	    ResultSet rs = st.executeQuery();
 	    while(rs.next()) {
 		Account a = new Account();
 		a.id = rs.getInt(1);
@@ -357,13 +383,15 @@ public class Model {
      */
     public ArrayList<Transaction> getTransactions(TxFilter f, int userId) {
 	ArrayList<Transaction> transactions = new ArrayList<Transaction>();
+	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "SELECT t.id, t.date, t.amount, c.code, a_debit.name, a_credit.name, "
 	    + "t.comment "
 	    + "FROM transactions t "
 	    + "JOIN accounts a_debit ON t.debit = a_debit.id "
 	    + "JOIN accounts a_credit ON t.credit = a_credit.id "
 	    + "JOIN currencies c ON t.currency = c.id "
-	    + "WHERE t.user_id = " + userId;
+	    + "WHERE t.user_id = ?";
+	values.add(userId);
 	if(f.minDate != null || f.maxDate != null || f.minAmount != null || f.maxAmount != null
 	   || f.currency != null || f.debit != null || f.credit != null || f.account != null
 	   || f.commentHas != null) {
@@ -371,7 +399,8 @@ public class Model {
 	    query += " AND ";
 	    if(f.minDate != null) {
 		firstCondition = false;
-		query += "date > '" + f.minDate + "'";
+		query += "date > ?";
+		values.add(f.minDate);
 	    }
 	    if(f.maxDate != null) {
 		if(!firstCondition) {
@@ -380,7 +409,8 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "date < '" + f.maxDate + "'";
+		query += "date < ?";
+		values.add(f.maxDate);
 	    }
 	    if(f.minAmount != null) {
 		if(!firstCondition) {
@@ -389,7 +419,8 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "amount > " + f.minAmount;
+		query += "amount > ?";
+		values.add(f.minAmount);
 	    }
 	    if(f.maxAmount != null) {
 		if(!firstCondition) {
@@ -398,7 +429,8 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "amount < " + f.maxAmount;
+		query += "amount < ?";
+		values.add(f.maxAmount);
 	    }
 	    if(f.currency != null) {
 		if(!firstCondition) {
@@ -407,7 +439,8 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "c.code = '" + f.currency + "'";
+		query += "c.code = ?";
+		values.add(f.currency);
 	    }
 	    if(f.debit != null) {
 		if(!firstCondition) {
@@ -416,7 +449,8 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "a_debit.name = '" + f.debit + "'";
+		query += "a_debit.name = ?";
+		values.add(f.debit);
 	    }
 	    if(f.credit != null) {
 		if(!firstCondition) {
@@ -425,7 +459,8 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "a_credit.name = '" + f.credit + "'";
+		query += "a_credit.name = ?";
+		values.add(f.credit);
 	    }
 	    if(f.account != null) {
 		if(!firstCondition) {
@@ -434,20 +469,25 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "(a_debit.name = '" + f.account
-		    + "' OR a_credit.name = '" + f.account + "')";
+		query += "(a_debit.name = ? OR a_credit.name = ?)";
+		values.add(f.account);
+		values.add(f.account);
 	    }
 	    if(f.commentHas != null) {
 		String pattern = f.commentHas.replace(" ", ".*");
 		if(!firstCondition) {
 		    query += " AND ";
 		}
-		query += "comment ~* '" + pattern + "'";
+		query += "comment ~* ?";
+		values.add(pattern);
 	    }
 	}
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    for(int i=0; i < values.size(); i++) {
+		st.setObject(i+1, values.get(i));
+	    }
+	    ResultSet rs = st.executeQuery();
 	    while(rs.next()) {
 		Transaction t = new Transaction();
 		t.id = rs.getInt(1);
@@ -477,10 +517,12 @@ public class Model {
 	    + "currency_types.name "
 	    + "FROM currencies "
 	    + "JOIN currency_types ON currencies.type = currency_types.id "
-	    + "WHERE user_id = " + userId + " AND code = '" + code + "'";
+	    + "WHERE user_id = ? AND code = ?";
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setString(2, code);
+	    ResultSet rs = st.executeQuery();
 	    if(rs.next()) {
 		c.id = rs.getInt(1);
 		c.code = rs.getString(2);
@@ -507,10 +549,12 @@ public class Model {
 	String query = "SELECT accounts.id, account_types.name, accounts.name "
 	    + "FROM accounts "
 	    + "JOIN account_types ON accounts.type = account_types.id "
-	    + "WHERE accounts.user_id = " + userId + " AND accounts.name = '" + name + "'";
+	    + "WHERE accounts.user_id = ? AND accounts.name = ?";
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setString(2, name);
+	    ResultSet rs = st.executeQuery();
 	    if(rs.next()) {
 		a.id = rs.getInt(1);
 		a.type = rs.getString(2);
@@ -539,10 +583,12 @@ public class Model {
 	    + "JOIN accounts a_debit ON t.debit = a_debit.id "
 	    + "JOIN accounts a_credit ON t.credit = a_credit.id "
 	    + "JOIN currencies c ON t.currency = c.id "
-	    + "WHERE t.user_id = " + userId + " AND t.id = " + id;
+	    + "WHERE t.user_id = ? AND t.id = ?";
 	try {
-	    Statement st = conn.createStatement();
-	    ResultSet rs = st.executeQuery(query);
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setInt(2, id);
+	    ResultSet rs = st.executeQuery();
 	    if(rs.next()) {
 		t.id = rs.getInt(1);
 		t.date = rs.getString(2);
@@ -568,11 +614,13 @@ public class Model {
      * Updates a currency
      */
     public String patchCurrency(String oldCode, Currency c, int userId) throws Exception, SQLException {
+	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "UPDATE currencies SET ";
 	boolean firstStatement = true;
 	if(c.code != null) {
 	    firstStatement = false;
-	    query += "code = '" + c.code + "'";
+	    query += "code = ?";
+	    values.add(c.code);
 	}
 	if(c.name != null) {
 	    if(!firstStatement) {
@@ -581,18 +629,25 @@ public class Model {
 	    else {
 		firstStatement = false;
 	    }
-	    query += "name = '" + c.name + "'";
+	    query += "name = ?";
+	    values.add(c.name);
 	}
 	if(c.type != null) {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
 	    int typeId = findCurrencyTypeId(c.type);
-	    query += "type = " + typeId;
+	    query += "type = ?";
+	    values.add(typeId);
 	}
-	query += " WHERE user_id = " + userId + " AND code = '" + oldCode + "' RETURNING code";
-	Statement st = conn.createStatement();
-	st.execute(query);
+	query += " WHERE user_id = ? AND code = ? RETURNING code";
+	values.add(userId);
+	values.add(oldCode);
+	PreparedStatement st = conn.prepareStatement(query);
+	for(int i=0; i < values.size(); i++) {
+	    st.setObject(i+1, values.get(i));
+	}
+	st.execute();
 	ResultSet rs = st.getResultSet();
 	String newCode = null;
 	if(rs.next()) {
@@ -610,22 +665,30 @@ public class Model {
      * Updates an account
      */
     public String patchAccount(String oldName, Account a, int userId) throws Exception, SQLException {
+	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "UPDATE accounts SET ";
 	boolean firstStatement = true;
 	if(a.type != null) {
 	    firstStatement = false;
 	    int typeId = findAccountTypeId(a.type);
-	    query += "type = " + typeId;
+	    query += "type = ?";
+	    values.add(typeId);
 	}
 	if(a.name != null) {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
-	    query += "name = '" + a.name + "'";
+	    query += "name = ?";
+	    values.add(a.name);
 	}
-	query += " WHERE user_id = " + userId + " AND name = '" + oldName + "' RETURNING name";
-	Statement st = conn.createStatement();
-	st.execute(query);
+	query += " WHERE user_id = ? AND name = ? RETURNING name";
+	values.add(userId);
+	values.add(oldName);
+	PreparedStatement st = conn.prepareStatement(query);
+	for(int i=0; i < values.size(); i++) {
+	    st.setObject(i+1, values.get(i));
+	}
+	st.execute();
 	ResultSet rs = st.getResultSet();
 	String newName = null;
 	if(rs.next()) {
@@ -643,11 +706,13 @@ public class Model {
      * Updates a transaction
      */
     public void patchTransaction(int id, Transaction t, int userId) throws Exception, SQLException {
+	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "UPDATE transactions SET ";
 	boolean firstStatement = true;
 	if(t.date != null) {
 	    firstStatement = false;
-	    query += "date = TIMESTAMP WITH TIME ZONE '" + t.date + "'";
+	    query += "date = ?";
+	    values.add(t.date);
 	}
 	if(t.amount != null) {
 	    if(!firstStatement) {
@@ -656,7 +721,8 @@ public class Model {
 	    else {
 		firstStatement = false;
 	    }
-	    query += "amount = " + t.amount;
+	    query += "amount = ?";
+	    values.add(t.amount);
 	}
 	if(t.currency != null) {
 	    if(!firstStatement) {
@@ -666,7 +732,8 @@ public class Model {
 		firstStatement = false;
 	    }
 	    int currencyId = findCurrencyId(t.currency, userId);
-	    query += "currency = " + currencyId;
+	    query += "currency = ?";
+	    values.add(currencyId);
 	}
 	if(t.debit != null) {
 	    if(!firstStatement) {
@@ -676,7 +743,8 @@ public class Model {
 		firstStatement = false;
 	    }
 	    int debitId = findAccountId(t.debit, userId);
-	    query += "debit = " + debitId;
+	    query += "debit = ?";
+	    values.add(debitId);
 	}
 	if(t.credit != null) {
 	    if(!firstStatement) {
@@ -686,17 +754,24 @@ public class Model {
 		firstStatement = false;
 	    }
 	    int creditId = findAccountId(t.credit, userId);
-	    query += "credit = " + creditId;
+	    query += "credit = ?";
+	    values.add(creditId);
 	}
 	if(t.comment != null) {
 	    if(!firstStatement) {
 		query += ", ";
 	    }
-	    query += "comment = '" + t.comment + "'";
+	    query += "comment = ?";
+	    values.add(t.comment);
 	}
-	query += " WHERE user_id = " + userId + " AND id = " + id;
-	Statement st = conn.createStatement();
-	int rowsUpdated = st.executeUpdate(query);
+	query += " WHERE user_id = ? AND id = ?";
+	values.add(userId);
+	values.add(id);
+	PreparedStatement st = conn.prepareStatement(query);
+	for(int i=0; i < values.size(); i++) {
+	    st.setObject(i+1, values.get(i));
+	}
+	int rowsUpdated = st.executeUpdate();
 	st.close();
 	if(rowsUpdated == 0) {
 	    throw new Exception("Transaction id not found.");
@@ -707,9 +782,11 @@ public class Model {
      * Deletes a currency
      */
     public void deleteCurrency(String code, int userId) throws Exception, SQLException {
-	String query = "DELETE FROM currencies WHERE user_id = " + userId + " AND code = '" + code + "'";
-	Statement st = conn.createStatement();
-	int rowsDeleted = st.executeUpdate(query);
+	String query = "DELETE FROM currencies WHERE user_id = ? AND code = ?";
+	PreparedStatement st = conn.prepareStatement(query);
+	st.setInt(1, userId);
+	st.setString(2, code);
+	int rowsDeleted = st.executeUpdate();
 	st.close();
 	if(rowsDeleted == 0) {
 	    throw new Exception("Currency code not found.");
@@ -720,9 +797,11 @@ public class Model {
      * Deletes an account
      */
     public void deleteAccount(String name, int userId) throws Exception, SQLException {
-	String query = "DELETE FROM accounts WHERE user_id = " + userId + " AND name = '" + name + "'";
-	Statement st = conn.createStatement();
-	int rowsDeleted = st.executeUpdate(query);
+	String query = "DELETE FROM accounts WHERE user_id = ? AND name = ?";
+	PreparedStatement st = conn.prepareStatement(query);
+	st.setInt(1, userId);
+	st.setString(2, name);
+	int rowsDeleted = st.executeUpdate();
 	st.close();
 	if(rowsDeleted == 0) {
 	    throw new Exception("Account name not found.");
@@ -733,9 +812,11 @@ public class Model {
      * Deletes a transaction
      */
     public void deleteTransaction(int id, int userId) throws Exception, SQLException {
-	String query = "DELETE FROM transactions WHERE user_id = " + userId + " AND id = " + id;
-	Statement st = conn.createStatement();
-	int rowsDeleted = st.executeUpdate(query);
+	String query = "DELETE FROM transactions WHERE user_id = ? AND id = ?";
+	PreparedStatement st = conn.prepareStatement(query);
+	st.setInt(1, userId);
+	st.setInt(2, id);
+	int rowsDeleted = st.executeUpdate();
 	st.close();
 	if(rowsDeleted == 0) {
 	    throw new Exception("Transaction id not found.");
