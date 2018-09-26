@@ -150,13 +150,13 @@ public class Logic {
 	    throw new Exception("Please specify an amount.");
 	}
 	if(t.currency == null) {
-	    throw new Exception("Please specify a currency code.");
+	    throw new Exception("Please specify a currency.");
 	}
 	if(t.debit == null) {
-	    throw new Exception("Please specify the name of the account to debit from.");
+	    throw new Exception("Please specify an account to debit from.");
 	}
 	if(t.credit == null) {
-	    throw new Exception("Please specify the name of the account to credit from.");
+	    throw new Exception("Please specify an account to credit from.");
 	}
 	int newId = model.postTransactions(t, userId);
 	Model.Transaction newTx = model.getTransaction(newId, userId);

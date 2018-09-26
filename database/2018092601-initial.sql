@@ -81,7 +81,7 @@ CREATE TABLE debo.transactions (
        currency INT NOT NULL REFERENCES debo.currencies,
        debit INT NOT NULL REFERENCES debo.accounts,
        credit INT NOT NULL REFERENCES debo.accounts,
-       comment TEXT,
+       comment TEXT NOT NULL DEFAULT '',
        CONSTRAINT debit_not_credit CHECK (debit != credit)
 );
 
@@ -91,7 +91,9 @@ VALUES (1, 35450, 5, 1, 5, 'initial balance'),
        (1, 0.58374957, 6, 3, 6, 'initial balance'),
        (1, 12000, 5, 4, 2, 'McDonalds with friends'),
        (1, 600000, 5, 2, 1, 'took some bucks out of the ATM'),
-       (1, 35550, 5, 4, 2, NULL),
        (1, 100000, 5, 1, 2, 'I deposited some money in my bank account'),
        (1, 10000, 5, 2, 4, 'Got a refund from the restaurant'),
        (1, 123450, 5, 5, 4, 'the restaurant had refunded me in the past');
+
+INSERT INTO debo.transactions (user_id, amount, currency, debit, credit)
+VALUES (1, 35550, 5, 4, 2);
