@@ -1,5 +1,6 @@
 package com.github.emi_silva.debo;
 
+import org.rapidoid.setup.App;
 import org.rapidoid.setup.On;
 import org.rapidoid.u.U;
 import org.rapidoid.http.Req;
@@ -21,6 +22,7 @@ public class Controller {
     
     public static void main(String[] args)
     {
+	App.bootstrap(args);
 	logic = new Logic();
 
 	On.req(req -> {
