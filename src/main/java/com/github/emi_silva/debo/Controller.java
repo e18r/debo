@@ -56,6 +56,18 @@ public class Controller {
 		}
 	    });
 
+	On.get("/logout").json((Req req) -> {
+		int userId;
+		try {
+		    userId = authenticate(req);
+		}
+		catch(Exception e) {
+		    return req.response().result("").code(401);
+		}
+		logic.logout(userId);
+		return "";
+	    });
+
 	On.get("/currency_types").json((Req req) -> {
 		try {
 		    authenticate(req);

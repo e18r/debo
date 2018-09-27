@@ -131,6 +131,13 @@ public class Logic {
 	return userId;
     }
 
+    /**
+     * Logs a user out
+     */
+    public void logout(int userId) {
+	model.logout(userId);
+    }
+
     public ArrayList<Model.CurrencyType> getCurrencyTypes() {
 	return model.getCurrencyTypes();
     }

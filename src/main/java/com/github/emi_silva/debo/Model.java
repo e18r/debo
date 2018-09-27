@@ -147,6 +147,22 @@ public class Model {
     }
 
     /**
+     * Invalidates a token
+     */
+    public void logout(int userId) {
+	String query = "UPDATE users SET token_expires = ? WHERE id = ?";
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setTimestamp(1, Timestamp.from(Instant.now()));
+	    st.setInt(2, userId);
+	    int rowsUpdated = st.executeUpdate();
+	}
+	catch(SQLException e) {
+	    System.out.println(e.getMessage());
+	}
+    }
+
+    /**
      * Returns a list of currency types
      */
     public ArrayList<CurrencyType> getCurrencyTypes() {
