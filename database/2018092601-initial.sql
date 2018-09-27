@@ -27,11 +27,12 @@ VALUES (1, 'asset'),
 CREATE TABLE debo.users (
        id SERIAL PRIMARY KEY,
        email VARCHAR UNIQUE NOT NULL,
-       session_token VARCHAR NOT NULL
+       session_token VARCHAR NOT NULL,
+       token_expires TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
-INSERT INTO debo.users (email, session_token)
-VALUES ('satoshi@nakamotoinstitute.org', 'V014adcmHAVMq6DTAv5QCVbGWMg45kaCgCUGmU6VL8bsFpnWuF97zJ15psvWqWto');
+INSERT INTO debo.users (email, session_token, token_expires)
+VALUES ('satoshi@nakamotoinstitute.org', 'V014adcmHAVMq6DTAv5QCVbGWMg45kaCgCUGmU6VL8bsFpnWuF97zJ15psvWqWto', '2018-09-26 16:24:05-05');
 
 CREATE TABLE debo.currencies (
        id SERIAL PRIMARY KEY,

@@ -5,6 +5,8 @@ import org.rapidoid.setup.On;
 import org.rapidoid.u.U;
 import org.rapidoid.http.Req;
 import org.rapidoid.http.Resp;
+import java.util.ArrayList;
+import java.time.Instant;
 
 public class Controller {
 
@@ -44,8 +46,10 @@ public class Controller {
 		try {
 		    String accessToken = logic.getAccessToken(code);
 		    String email = logic.getEmail(accessToken);
-		    String sessionToken = logic.getSessionToken(email);
-		    return req.response().result(U.map("session_token", sessionToken));
+		    ArrayList<Object> session = logic.getSession(email);
+		    String sessionToken = (String) session.get(0);
+		    Instant tokenExpires = (Instant) session.get(1);
+		    return req.response().result(U.map("session_token", sessionToken, "token_expires", tokenExpires.toString()));
 		}
 		catch(Exception e) {
 		    return handleException(e, req);

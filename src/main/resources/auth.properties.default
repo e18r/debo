@@ -26,3 +26,5 @@ grantType=authorization_code
 APIEndpoint=https://www.googleapis.com/oauth2/v1/userinfo
 alt=json
 authKeyword=Bearer
+tokenLength=64
+tokenLifetime=3600

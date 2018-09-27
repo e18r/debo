@@ -13,7 +13,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.lang.Exception;
 import java.math.BigDecimal;
-
+import java.time.Instant;
+import java.sql.Timestamp;
 
 // TODO (critical): Put closing statements in finally blocks to tackle DoS attacks
 
@@ -66,13 +67,17 @@ public class Model {
     }
 
     /**
-     * Creates a new user
+     * Create a new token for a user. If the user doesn't exist, insert it.
      */
-    public void newUser(String email, String sessionToken) throws Exception {
-	String query = "INSERT INTO users (email, session_token) VALUES (?, ?)";
+    public void newToken(String email, String sessionToken, Instant tokenExpires) throws Exception {
+	String query = "INSERT INTO users (email, session_token, token_expires) VALUES (?, ?, ?) "
+	    + "ON CONFLICT (email) DO UPDATE SET session_token = ?, token_expires = ?";
 	PreparedStatement st = conn.prepareStatement(query);
 	st.setString(1, email);
 	st.setString(2, sessionToken);
+	st.setTimestamp(3, Timestamp.from(tokenExpires));
+	st.setString(4, sessionToken);
+	st.setTimestamp(5, Timestamp.from(tokenExpires));
 	int rowsInserted = st.executeUpdate();
 	if(rowsInserted != 1) {
 	    throw new Exception("There was an error creating the user.");
@@ -81,17 +86,19 @@ public class Model {
     }
 
     /**
-     * Retrieves a session token
+     * Retrieves a session token and expiration date
      */
-    public String getSessionToken(String email) throws Exception {
+    public ArrayList<Object> getSession(String email) throws Exception {
 	String sessionToken;
-	String query = "SELECT session_token FROM users WHERE email = ?";
+	Instant tokenExpires;
+	String query = "SELECT session_token, token_expires FROM users WHERE email = ?";
 	try {
 	    PreparedStatement st = conn.prepareStatement(query);
 	    st.setString(1, email);
 	    ResultSet rs = st.executeQuery();
 	    if(rs.next()) {
 		sessionToken = rs.getString(1);
+		tokenExpires = rs.getTimestamp(2).toInstant();
 	    }
 	    else {
 		throw new Exception("This user is not registered.");
@@ -103,21 +110,33 @@ public class Model {
 	    System.out.println(e);
 	    return null;
 	}
-	return sessionToken;
+	if(Instant.now().isAfter(tokenExpires)) {
+	    throw new Exception("Session expired");
+	}
+	else {
+	    ArrayList<Object> session = new ArrayList<Object>();
+	    session.add(sessionToken);
+	    session.add(tokenExpires);
+	    return session;
+	}
     }
 
     /**
-     * Authenticates a user
+     * Checks whether a session token exists and hasn't expired
      */
     public int authenticate(String sessionToken) throws Exception {
-	String query = "SELECT id FROM users WHERE session_token = ?";
+	String query = "SELECT id, token_expires FROM users WHERE session_token = ?";
 	PreparedStatement st = conn.prepareStatement(query);
 	st.setString(1, sessionToken);
 	ResultSet rs = st.executeQuery();
 	if(rs.next()) {
 	    int userId = rs.getInt(1);
+	    Instant tokenExpires = rs.getTimestamp(2).toInstant();
 	    rs.close();
 	    st.close();
+	    if(Instant.now().isAfter(tokenExpires)) {
+		throw new Exception("Session expired.");
+	    }
 	    return userId;
 	}
 	else {

@@ -7,8 +7,8 @@ import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import org.json.JSONObject;
-
 import java.util.ArrayList;
+import java.time.Instant;
 
 public class Logic {
 
@@ -83,7 +83,7 @@ public class Logic {
 
     /**
      * Generates a random string
-     * Inspired from https://stackoverflow.com/a/41156/2430274
+     * Inspired by https://stackoverflow.com/a/41156/2430274
      */
     public String newRandomString(int length) {
 	char[] token = new char[length];
@@ -94,20 +94,32 @@ public class Logic {
     }
 
     /**
-     * Retreives or creates a session token, and returns it to the user
+     * Retreives or creates a session token and an expiration date, and returns them to the user
      */
-    public String getSessionToken(String email) throws Exception {
+    public ArrayList<Object> getSession(String email) throws Exception {
 	String sessionToken;
+	Instant tokenExpires;
 	try {
-	    sessionToken = model.getSessionToken(email);
+	    ArrayList<Object> session = model.getSession(email);
+	    sessionToken = (String) session.get(0);
+	    tokenExpires = (Instant) session.get(1);
 	}
 	catch(Exception e) {
-	    sessionToken = newRandomString(64);
-	    model.newUser(email, sessionToken);
+	    int length = Integer.valueOf(authProps.getProperty("tokenLength"));
+	    sessionToken = newRandomString(length);
+	    long lifetime = Long.valueOf(authProps.getProperty("tokenLifetime"));
+	    tokenExpires = Instant.now().plusSeconds(lifetime);
+	    model.newToken(email, sessionToken, tokenExpires);
 	}
-	return sessionToken;
+	ArrayList<Object> session = new ArrayList<Object>();
+	session.add(sessionToken);
+	session.add(tokenExpires);
+	return session;
     }
 
+    /**
+     * Checks whether a request's credentials are valid
+     */
     public int authenticate(String authHeader) throws Exception {
 	String[] authElems = authHeader.split(" ");
 	String authKeyword = authElems[0];
