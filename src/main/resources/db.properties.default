@@ -4,12 +4,35 @@
 # Copy this file to db.properties and make the necessary changes.
 #
 
+# Database URL
+url=jdbc:postgresql://localhost:5432/debo
+
 # Database username
 user=debo
 
 # Database password
 password=BxVn5g5VmNP16kS89CqawmtJboCnau7F
 
-# The following should probably be left untouched
+# Database schema
 currentSchema=debo
+
+# Accept strings as SQL timestamps
 stringtype=unspecified
+
+# Currencies' unique constraint
+currUniqueCnst=code_uniqueness
+
+# Accounts' unique constraint
+accUniqueCnst=name_uniqueness
+
+# Transactions' debit-different-from-credit constraint
+txDifferentCnst=debit_not_credit
+
+# Transactions' amount-must-be-positive constraint
+txPositiveCnst=positive_amount
+
+# Transactions' invalid timestamp message
+txTimestampMsg=invalid input syntax for type timestamp with time zone
+
+# Foreign key constraint message
+foreignCnst=violates foreign key constraint

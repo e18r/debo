@@ -4,27 +4,47 @@
 # Copy this file to auth.properties and make the necessary changes
 #
 
-# ID of your Google Project (https://console.developers.google.com/)
+# Google Project ID (https://console.developers.google.com/)
 clientId=920924587623-n2s5sc25joh4ffm058fv90l60oel88j5.apps.googleusercontent.com
 
-# Password of your Google Project
+# Google Project password
 clientSecret=0LbTuEGKYKyHLwTaE6JZqTxM
 
-# Redirect URI. It's your project's URI + "/redirect"
+# Redirect URI. It's the project's URI + "/redirect"
 redirectUri=http://www.example.com/redirect
 
 # Random Seed
 seed=XEDmK3EY6pitcza4Eon51xVBKfw8YnOOidOYjxlSIIU89F3OcQZ8xv5eqZqKhxGP
 
-# The following should probably be left untouched
+# Google's OAuth endpoint
 oauthEndpoint=https://accounts.google.com/o/oauth2/v2/auth
+
+# Requested access permission for the Google account
 scope=email
+
+# Mandatory parameter for the user's OAuth request
 responseType=code
+
+# Google's Access Token endpoint
 accessTokenEndpoint=https://www.googleapis.com/oauth2/v4/token
+
+# Mandatory header for the access token request
 contentHeader=application/x-www-form-urlencoded
+
+# Mandatory parameter for the access token request
 grantType=authorization_code
+
+# Google's API endpoint
 APIEndpoint=https://www.googleapis.com/oauth2/v1/userinfo
+
+# Format parameter for the API request
 alt=json
+
+# Keyword for the Authorization header in each authenticated request to Debo
 authKeyword=Bearer
+
+# Length of Debo's session token
 tokenLength=64
+
+# Lifetime, measured in seconds, of Debo's session tokens
 tokenLifetime=3600

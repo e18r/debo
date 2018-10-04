@@ -83,7 +83,8 @@ CREATE TABLE debo.transactions (
        debit INT NOT NULL REFERENCES debo.accounts,
        credit INT NOT NULL REFERENCES debo.accounts,
        comment TEXT NOT NULL DEFAULT '',
-       CONSTRAINT debit_not_credit CHECK (debit != credit)
+       CONSTRAINT debit_not_credit CHECK (debit != credit),
+       CONSTRAINT positive_amount CHECK (amount > 0)
 );
 
 INSERT INTO debo.transactions (user_id, amount, currency, debit, credit, comment)

@@ -5,6 +5,9 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 import java.util.Properties;
 import java.util.ArrayList;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.sql.SQLException;
 
 public class ModelTest extends TestCase {
 
@@ -29,7 +32,7 @@ public class ModelTest extends TestCase {
     /**
      * Checks the database is initialized correctly
      */
-    public void testModel() {
+    public void testModel() throws Exception {
 	model = new Model();
         assertNotNull(model.conn);
     }
@@ -37,7 +40,7 @@ public class ModelTest extends TestCase {
     /**
      * Checks properties are read
      */
-    public void testReadProps() {
+    public void testReadProps() throws Exception {
 	model = new Model();
 	Properties props = model.readProps("/db.properties");
 	String schema = props.getProperty("currentSchema");

@@ -15,25 +15,23 @@ import java.lang.Exception;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.sql.Timestamp;
+import java.util.HashMap;
 
 // TODO (critical): Put closing statements in finally blocks to tackle DoS attacks
 
 public class Model {
 
     Connection conn;
+    Properties props;
 
     /**
      * Initializes the database connection
      */
-    public Model() {
-	String url = "jdbc:postgresql://localhost:5432/debo";
-	Properties props = readProps("/db.properties");
-	try {
-	    conn = DriverManager.getConnection(url, props);
-	}
-	catch(SQLException e) {
-	    System.out.println(e);
-	}
+    public Model() throws FileNotFoundException, IOException, NullPointerException,
+			  SQLException {
+	props = readProps("/db.properties");
+	String url = props.getProperty("url");
+	conn = DriverManager.getConnection(url, props);
     }
 
     /**
@@ -41,55 +39,59 @@ public class Model {
      * @param relPath the relative path of the file starting from src/main/resources
      * @return the Properties object
      */
-    Properties readProps(String relPath) {
+    Properties readProps(String relPath) throws FileNotFoundException, IOException,
+						NullPointerException {
 	String defaultExt = ".default";
 	Properties props = new Properties();
 	URL defaultLocation = this.getClass().getResource(relPath + defaultExt);
 	URL location = this.getClass().getResource(relPath);
-	try {
-	    FileReader defaultFile = new FileReader(defaultLocation.getPath());
-	    props.load(defaultFile);
-	    defaultFile.close();
-	    FileReader file = new FileReader(location.getPath());
-	    props.load(file);
-	    file.close();
-	}
-	catch (FileNotFoundException e) {
-	    System.out.println(e.getMessage());
-	}
-	catch (IOException e) {
-	    System.out.println(e.getMessage());
-	}
-	catch(NullPointerException e) {
-	    System.out.println(e.getMessage());
-	}
+	FileReader defaultFile = new FileReader(defaultLocation.getPath());
+	props.load(defaultFile);
+	defaultFile.close();
+	FileReader file = new FileReader(location.getPath());
+	props.load(file);
+	file.close();
 	return props;
     }
 
     /**
      * Create a new token for a user. If the user doesn't exist, insert it.
      */
-    public void newToken(String email, String sessionToken, Instant tokenExpires) throws Exception {
+    public HashMap<String, String> newToken(String email, String sessionToken,
+					    Instant tokenExpires) throws DeboException {
+	HashMap<String, String> session = new HashMap<String, String>();
 	String query = "INSERT INTO users (email, session_token, token_expires) VALUES (?, ?, ?) "
-	    + "ON CONFLICT (email) DO UPDATE SET session_token = ?, token_expires = ?";
-	PreparedStatement st = conn.prepareStatement(query);
-	st.setString(1, email);
-	st.setString(2, sessionToken);
-	st.setTimestamp(3, Timestamp.from(tokenExpires));
-	st.setString(4, sessionToken);
-	st.setTimestamp(5, Timestamp.from(tokenExpires));
-	int rowsInserted = st.executeUpdate();
-	if(rowsInserted != 1) {
-	    throw new Exception("There was an error creating the user.");
+	    + "ON CONFLICT (email) DO UPDATE SET session_token = ?, token_expires = ? "
+	    + "RETURNING session_token, token_expires";
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setString(1, email);
+	    st.setString(2, sessionToken);
+	    st.setTimestamp(3, Timestamp.from(tokenExpires));
+	    st.setString(4, sessionToken);
+	    st.setTimestamp(5, Timestamp.from(tokenExpires));
+	    st.execute();
+	    ResultSet rs = st.getResultSet();
+	    if(rs.next()) {
+		session.put("session_token", rs.getString(1));
+		session.put("token_expires", rs.getTimestamp(2).toInstant().toString());
+	    }
+	    else {
+		throw new DeboException(500, "A database error occurred.");
+	    }
+	    st.close();
 	}
-	st.close();
+	catch(SQLException e) {
+	    throw new DeboException(500, "A database error occurred.");
+	}
+	return session;
     }
 
     /**
      * Retrieves a session token and expiration date
      */
-    public ArrayList<Object> getSession(String email) throws Exception {
-	String sessionToken;
+    public HashMap<String, String> getSession(String email) throws DeboException {
+	HashMap<String, String> session = new HashMap<String, String>();
 	Instant tokenExpires;
 	String query = "SELECT session_token, token_expires FROM users WHERE email = ?";
 	try {
@@ -97,26 +99,23 @@ public class Model {
 	    st.setString(1, email);
 	    ResultSet rs = st.executeQuery();
 	    if(rs.next()) {
-		sessionToken = rs.getString(1);
+		session.put("session_token", rs.getString(1));
 		tokenExpires = rs.getTimestamp(2).toInstant();
+		session.put("token_expires", tokenExpires.toString());
 	    }
 	    else {
-		throw new Exception("This user is not registered.");
+		throw new DeboException(412, "Please create a user.");
 	    }
 	    rs.close();
 	    st.close();
 	}
 	catch(SQLException e) {
-	    System.out.println(e);
-	    return null;
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	if(Instant.now().isAfter(tokenExpires)) {
-	    throw new Exception("Session expired");
+	    throw new DeboException(412, "Please create a token.");
 	}
 	else {
-	    ArrayList<Object> session = new ArrayList<Object>();
-	    session.add(sessionToken);
-	    session.add(tokenExpires);
 	    return session;
 	}
     }
@@ -124,32 +123,37 @@ public class Model {
     /**
      * Checks whether a session token exists and hasn't expired
      */
-    public int authenticate(String sessionToken) throws Exception {
+    public int authenticate(String sessionToken) throws DeboException {
 	String query = "SELECT id, token_expires FROM users WHERE session_token = ?";
-	PreparedStatement st = conn.prepareStatement(query);
-	st.setString(1, sessionToken);
-	ResultSet rs = st.executeQuery();
-	if(rs.next()) {
-	    int userId = rs.getInt(1);
-	    Instant tokenExpires = rs.getTimestamp(2).toInstant();
-	    rs.close();
-	    st.close();
-	    if(Instant.now().isAfter(tokenExpires)) {
-		throw new Exception("Session expired.");
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setString(1, sessionToken);
+	    ResultSet rs = st.executeQuery();
+	    if(rs.next()) {
+		int userId = rs.getInt(1);
+		Instant tokenExpires = rs.getTimestamp(2).toInstant();
+		rs.close();
+		st.close();
+		if(Instant.now().isAfter(tokenExpires)) {
+		    throw new DeboException(401, "The session expired.");
+		}
+		return userId;
 	    }
-	    return userId;
+	    else {
+		rs.close();
+		st.close();
+		throw new DeboException(401, "Invalid session token.");
+	    }
 	}
-	else {
-	    rs.close();
-	    st.close();
-	    throw new Exception("User not authenticated.");
+	catch(SQLException e) {
+	    throw new DeboException(500, "A database error occurred.");
 	}
     }
 
     /**
      * Invalidates a token
      */
-    public void logout(int userId) {
+    public void logout(int userId) throws DeboException {
 	String query = "UPDATE users SET token_expires = ? WHERE id = ?";
 	try {
 	    PreparedStatement st = conn.prepareStatement(query);
@@ -158,14 +162,14 @@ public class Model {
 	    int rowsUpdated = st.executeUpdate();
 	}
 	catch(SQLException e) {
-	    System.out.println(e.getMessage());
+	    throw new DeboException(500, "A database error occurred.");
 	}
     }
 
     /**
      * Returns a list of currency types
      */
-    public ArrayList<CurrencyType> getCurrencyTypes() {
+    public ArrayList<CurrencyType> getCurrencyTypes() throws DeboException {
 	ArrayList<CurrencyType> cts = new ArrayList<CurrencyType>();
 	String query = "SELECT id, name FROM currency_types";
 	try {
@@ -181,7 +185,7 @@ public class Model {
 	    st.close();
 	}
 	catch (SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return cts;
     }
@@ -189,7 +193,7 @@ public class Model {
     /**
      * Returns a list of account types
      */
-    public ArrayList<AccountType> getAccountTypes() {
+    public ArrayList<AccountType> getAccountTypes() throws DeboException {
 	ArrayList<AccountType> ats = new ArrayList<AccountType>();
 	String query = "SELECT id, name FROM account_types";
 	try {
@@ -205,7 +209,7 @@ public class Model {
 	    st.close();
 	}
 	catch(SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return ats;
     }
@@ -213,102 +217,127 @@ public class Model {
     /**
      * Finds a currency type id given its name
      */
-    public int findCurrencyTypeId(String type) throws Exception {
-	for(CurrencyType ct : getCurrencyTypes()) {
+    public int findCurrencyTypeId(String type) throws DeboException {
+	ArrayList<CurrencyType> currencyTypes = getCurrencyTypes();
+	ArrayList<String> names = new ArrayList<String>();
+	for(CurrencyType ct : currencyTypes) {
+	    names.add(ct.name);
 	    if(ct.name.equals(type)) {
 		return ct.id;
 	    }
 	}
-	throw new Exception("Currency type not found.");
+	throw new DeboException(400, "Valid types are: " + String.join(", ", names) + ".");
     }
 
     /**
      * Finds a currency id given its code
      */
-    public int findCurrencyId(String code, int userId) throws Exception {
+    public int findCurrencyId(String code, int userId) throws DeboException {
 	ArrayList<Currency> currencies = getCurrencies(new Currency(), userId);
 	for(Currency c : currencies) {
 	    if(c.code.equals(code)) {
 		return c.id;
 	    }
 	}
-	throw new Exception("Currency code not found.");
+	throw new DeboException(400, "Currency '" + code + "' doesn't exist.");
     }
 
     /**
      * Finds an account type id given its name
      */
-    public int findAccountTypeId(String type) throws Exception {
+    public int findAccountTypeId(String type) throws DeboException {
 	ArrayList<AccountType> ats = getAccountTypes();
+	ArrayList<String> names = new ArrayList<String>();
 	for(AccountType at : ats) {
+	    names.add(at.name);
 	    if(at.name.equals(type)) {
 		return at.id;
 	    }
 	}
-	throw new Exception("Account type not found.");
+	throw new DeboException(400, "Valid types are: " + String.join(", ", names) + ".");
     }
 
     /**
      * Finds an account id given its name
      */
-    public int findAccountId(String name, int userId) throws Exception {
+    public int findAccountId(String name, int userId) throws DeboException {
 	ArrayList<Account> accounts = getAccounts(new Account(), userId);
 	for(Account a : accounts) {
 	    if(a.name.equals(name)) {
 		return a.id;
 	    }
 	}
-	throw new Exception("Account id not found.");
+	throw new DeboException(400, "Account '" + name + "' doesn't exist.");
     }
 
     /**
      * Creates a currency
      */
-    public String postCurrencies(Currency c, int userId) throws Exception, SQLException {
-	int type = findCurrencyTypeId(c.type);
+    public String postCurrencies(Currency c, int userId) throws DeboException {
+	String code;
 	String query = "INSERT INTO currencies (user_id, code, name, type) "
 	    + "VALUES (?, ?, ?, ?) RETURNING code";
-	PreparedStatement st = conn.prepareStatement(query);
-	st.setInt(1, userId);
-	st.setString(2, c.code);
-	st.setString(3, c.name);
-	st.setInt(4, type);
-	st.execute();
-	ResultSet rs = st.getResultSet();
-	rs.next();
-	String code = rs.getString(1);
-	rs.close();
-	st.close();
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setString(2, c.code);
+	    st.setString(3, c.name);
+	    int type = findCurrencyTypeId(c.type);
+	    st.setInt(4, type);
+	    st.execute();
+	    ResultSet rs = st.getResultSet();
+	    rs.next();
+	    code = rs.getString(1);
+	    rs.close();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    String currUniqueCnst = props.getProperty("currUniqueCnst");
+	    if(e.getMessage().contains(currUniqueCnst)) {
+		throw new DeboException(400, "A currency with code '" + c.code + "' already "
+					+ "exists.");
+	    }
+	    throw new DeboException(500, "A database error occurred.");
+	}
 	return code;
     }
     
     /**
      * Creates an account
      */
-    public String postAccounts(Account a, int userId) throws Exception, SQLException {       
-	int typeId = findAccountTypeId(a.type);
+    public String postAccounts(Account a, int userId) throws DeboException {
+	String name;
 	String query = "INSERT INTO accounts (user_id, name, type) "
 	    + "VALUES (?, ?, ?) RETURNING name";
-	PreparedStatement st = conn.prepareStatement(query);
-	st.setInt(1, userId);
-	st.setString(2, a.name);
-	st.setInt(3, typeId);
-	st.execute();
-	ResultSet rs = st.getResultSet();
-	rs.next();
-	String name = rs.getString(1);
-	rs.close();
-	st.close();
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setString(2, a.name);
+	    int typeId = findAccountTypeId(a.type);
+	    st.setInt(3, typeId);
+	    st.execute();
+	    ResultSet rs = st.getResultSet();
+	    rs.next();
+	    name = rs.getString(1);
+	    rs.close();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    String accUniqueCnst = props.getProperty("accUniqueCnst");
+	    if(e.getMessage().contains(accUniqueCnst)) {
+		throw new DeboException(400, "An account with name '" + a.name +  "' already "
+					+ "exists.");
+	    }
+	    throw new DeboException(500, "A database error occurred.");
+	}
 	return name;
     }
 
     /**
      * Creates a transaction
      */
-    public int postTransactions(Transaction t, int userId) throws Exception, SQLException {
-	int currencyId = findCurrencyId(t.currency, userId);
-	int debitId = findAccountId(t.debit, userId);
-	int creditId = findAccountId(t.credit, userId);
+    public int postTransactions(Transaction t, int userId) throws DeboException {
+	int id;
 	int optionalFields = 0;
 	String query = "INSERT INTO transactions (user_id, ";
 	if(t.date != null) {
@@ -325,33 +354,53 @@ public class Model {
 	    query += ", ?";
 	}
 	query += ") RETURNING id";
-	PreparedStatement st = conn.prepareStatement(query);
-	int offset = 0;
-	st.setInt(1, userId);
-	if(t.date != null) {
-	    st.setString(2, t.date);
-	    offset = 1;
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    int offset = 0;
+	    st.setInt(1, userId);
+	    if(t.date != null) {
+		st.setString(2, t.date);
+		offset = 1;
+	    }
+	    st.setBigDecimal(2 + offset, t.amount);
+	    int currencyId = findCurrencyId(t.currency, userId);
+	    st.setInt(3 + offset, currencyId);
+	    int debitId = findAccountId(t.debit, userId);
+	    st.setInt(4 + offset, debitId);
+	    int creditId = findAccountId(t.credit, userId);
+	    st.setInt(5 + offset, creditId);
+	    if(t.comment != null) {
+		st.setString(6 + offset, t.comment);
+	    }
+	    st.execute();
+	    ResultSet rs = st.getResultSet();
+	    rs.next();
+	    id = rs.getInt(1);
+	    rs.close();
+	    st.close();
 	}
-	st.setBigDecimal(2 + offset, t.amount);
-	st.setInt(3 + offset, currencyId);
-	st.setInt(4 + offset, debitId);
-	st.setInt(5 + offset, creditId);
-	if(t.comment != null) {
-	    st.setString(6 + offset, t.comment);
+	catch(SQLException e) {
+	    String txDifferentCnst = props.getProperty("txDifferentCnst");
+	    if(e.getMessage().contains(txDifferentCnst)) {
+		throw new DeboException(400, "The debit and credit accounts must be different.");
+	    }
+	    String txPositiveCnst = props.getProperty("txPositiveCnst");
+	    if(e.getMessage().contains(txPositiveCnst)) {
+		throw new DeboException(400, "The amount must be positive.");
+	    }
+	    String txTimestampMsg = props.getProperty("txTimestampMsg");
+	    if(e.getMessage().contains(txTimestampMsg)) {
+		throw new DeboException(400, "Unrecognizable date format. Use ISO 8601.");
+	    }
+	    throw new DeboException(500, "A database error occurred.");
 	}
-	st.execute();
-	ResultSet rs = st.getResultSet();
-	rs.next();
-	int id = rs.getInt(1);
-	rs.close();
-	st.close();
 	return id;
     }
 
     /**
      * Returns a (filtered) list of currencies
      */
-    public ArrayList<Currency> getCurrencies(Currency filter, int userId) {
+    public ArrayList<Currency> getCurrencies(Currency filter, int userId) throws DeboException {
 	ArrayList<Currency> currencies = new ArrayList<Currency>();
 	String query = "SELECT currencies.id, code, currencies.name, "
 	    + "currency_types.name "
@@ -380,7 +429,7 @@ public class Model {
 	    st.close();
 	}
 	catch (SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return currencies;
     }
@@ -388,7 +437,7 @@ public class Model {
     /**
      * Returns a (filtered) list of accounts
      */
-    public ArrayList<Account> getAccounts(Account filter, int userId) {
+    public ArrayList<Account> getAccounts(Account filter, int userId) throws DeboException {
 	ArrayList<Account> accounts = new ArrayList<Account>();
 	String query = "SELECT accounts.id, account_types.name, accounts.name "
 	    + "FROM accounts "
@@ -415,7 +464,7 @@ public class Model {
 	    st.close();
 	}
 	catch (SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return accounts;
     }
@@ -423,7 +472,7 @@ public class Model {
     /**
      * Returns a (filtered) list of transactions
      */
-    public ArrayList<Transaction> getTransactions(TxFilter f, int userId) {
+    public ArrayList<Transaction> getTransactions(TxFilter f, int userId) throws DeboException {
 	ArrayList<Transaction> transactions = new ArrayList<Transaction>();
 	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "SELECT t.id, t.date, t.amount, c.code, a_debit.name, a_credit.name, "
@@ -441,7 +490,7 @@ public class Model {
 	    query += " AND ";
 	    if(f.minDate != null) {
 		firstCondition = false;
-		query += "date > ?";
+		query += "date >= ?";
 		values.add(f.minDate);
 	    }
 	    if(f.maxDate != null) {
@@ -451,7 +500,7 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "date < ?";
+		query += "date <= ?";
 		values.add(f.maxDate);
 	    }
 	    if(f.minAmount != null) {
@@ -461,7 +510,7 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "amount > ?";
+		query += "amount >= ?";
 		values.add(f.minAmount);
 	    }
 	    if(f.maxAmount != null) {
@@ -471,7 +520,7 @@ public class Model {
 		else {
 		    firstCondition = false;
 		}
-		query += "amount < ?";
+		query += "amount <= ?";
 		values.add(f.maxAmount);
 	    }
 	    if(f.currency != null) {
@@ -545,7 +594,7 @@ public class Model {
 	    st.close();
 	}
 	catch (SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return transactions;
     }
@@ -553,7 +602,7 @@ public class Model {
     /**
      * Returns a single currency
      */
-    public Currency getCurrency(String code, int userId) {
+    public Currency getCurrency(String code, int userId) throws DeboException {
 	Currency c = new Currency();
 	String query = "SELECT currencies.id, code, currencies.name, "
 	    + "currency_types.name "
@@ -572,13 +621,13 @@ public class Model {
 		c.type = rs.getString(4);
 	    }
 	    else {
-		c = null;
+		throw new DeboException(404, "The requested currency doesn't exist.");
 	    }
 	    rs.close();
 	    st.close();
 	}
 	catch (SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return c;
     }
@@ -586,7 +635,7 @@ public class Model {
     /**
      * Returns a single account
      */
-    public Account getAccount(String name, int userId) {
+    public Account getAccount(String name, int userId) throws DeboException {
 	Account a = new Account();
 	String query = "SELECT accounts.id, account_types.name, accounts.name "
 	    + "FROM accounts "
@@ -603,13 +652,13 @@ public class Model {
 		a.name = rs.getString(3);
 	    }
 	    else {
-		a = null;
+		throw new DeboException(404, "The requested account doesn't exist.");
 	    }
 	    rs.close();
 	    st.close();
 	}
 	catch (SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return a;
     }
@@ -617,7 +666,7 @@ public class Model {
     /**
      * Returns a single transaction
      */
-    public Transaction getTransaction(int id, int userId) {
+    public Transaction getTransaction(int id, int userId) throws DeboException {
 	Transaction t = new Transaction();
 	String query = "SELECT t.id, t.date, t.amount, c.code, a_debit.name, "
 	    + "a_credit.name, t.comment "
@@ -641,13 +690,13 @@ public class Model {
 		t.comment = rs.getString(7);
 	    }
 	    else {
-		t = null;
+		throw new DeboException(404, "The requested transaction doesn't exist.");
 	    }
 	    rs.close();
 	    st.close();
 	}
 	catch(SQLException e) {
-	    System.out.println(e);
+	    throw new DeboException(500, "A database error occurred.");
 	}
 	return t;
     }
@@ -655,7 +704,8 @@ public class Model {
     /**
      * Updates a currency
      */
-    public String patchCurrency(String oldCode, Currency c, int userId) throws Exception, SQLException {
+    public String patchCurrency(String oldCode, Currency c, int userId) throws DeboException {
+	String newCode = null;
 	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "UPDATE currencies SET ";
 	boolean firstStatement = true;
@@ -685,20 +735,24 @@ public class Model {
 	query += " WHERE user_id = ? AND code = ? RETURNING code";
 	values.add(userId);
 	values.add(oldCode);
-	PreparedStatement st = conn.prepareStatement(query);
-	for(int i=0; i < values.size(); i++) {
-	    st.setObject(i+1, values.get(i));
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    for(int i=0; i < values.size(); i++) {
+		st.setObject(i+1, values.get(i));
+	    }
+	    st.execute();
+	    ResultSet rs = st.getResultSet();
+	    if(rs.next()) {
+		newCode = rs.getString(1);
+	    }
+	    rs.close();
+	    st.close();
 	}
-	st.execute();
-	ResultSet rs = st.getResultSet();
-	String newCode = null;
-	if(rs.next()) {
-	    newCode = rs.getString(1);
+	catch(SQLException e) {
+	    throw new DeboException(500, "A database error occurred.");
 	}
-	rs.close();
-	st.close();
 	if(newCode == null) {
-	    throw new Exception("Currency code not found.");
+	    throw new DeboException(404, "The requested currency doesn't exist.");
 	}
 	return newCode;
     }
@@ -706,7 +760,8 @@ public class Model {
     /**
      * Updates an account
      */
-    public String patchAccount(String oldName, Account a, int userId) throws Exception, SQLException {
+    public String patchAccount(String oldName, Account a, int userId) throws DeboException {
+	String newName = null;
 	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "UPDATE accounts SET ";
 	boolean firstStatement = true;
@@ -726,20 +781,24 @@ public class Model {
 	query += " WHERE user_id = ? AND name = ? RETURNING name";
 	values.add(userId);
 	values.add(oldName);
-	PreparedStatement st = conn.prepareStatement(query);
-	for(int i=0; i < values.size(); i++) {
-	    st.setObject(i+1, values.get(i));
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    for(int i=0; i < values.size(); i++) {
+		st.setObject(i+1, values.get(i));
+	    }
+	    st.execute();
+	    ResultSet rs = st.getResultSet();
+	    if(rs.next()) {
+		newName = rs.getString(1);
+	    }
+	    rs.close();
+	    st.close();
 	}
-	st.execute();
-	ResultSet rs = st.getResultSet();
-	String newName = null;
-	if(rs.next()) {
-	    newName = rs.getString(1);
+	catch(SQLException e) {
+	    throw new DeboException(500, "A database error occurred.");
 	}
-	rs.close();
-	st.close();
 	if(newName == null) {
-	    throw new Exception("Account name not found.");
+	    throw new DeboException(404, "The requested account doesn't exist.");
 	}
 	return newName;
     }
@@ -747,7 +806,8 @@ public class Model {
     /**
      * Updates a transaction
      */
-    public void patchTransaction(int id, Transaction t, int userId) throws Exception, SQLException {
+    public void patchTransaction(int id, Transaction t, int userId) throws DeboException {
+	int rowsUpdated = 0;
 	ArrayList<Object> values = new ArrayList<Object>();
 	String query = "UPDATE transactions SET ";
 	boolean firstStatement = true;
@@ -809,59 +869,104 @@ public class Model {
 	query += " WHERE user_id = ? AND id = ?";
 	values.add(userId);
 	values.add(id);
-	PreparedStatement st = conn.prepareStatement(query);
-	for(int i=0; i < values.size(); i++) {
-	    st.setObject(i+1, values.get(i));
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    for(int i=0; i < values.size(); i++) {
+		st.setObject(i+1, values.get(i));
+	    }
+	    rowsUpdated = st.executeUpdate();
+	    st.close();
 	}
-	int rowsUpdated = st.executeUpdate();
-	st.close();
+	catch(SQLException e) {
+	    String txDifferentCnst = props.getProperty("txDifferentCnst");
+	    if(e.getMessage().contains(txDifferentCnst)) {
+		throw new DeboException(400, "The debit and credit accounts must be different.");
+	    }
+	    String txPositiveCnst = props.getProperty("txPositiveCnst");
+	    if(e.getMessage().contains(txPositiveCnst)) {
+		throw new DeboException(400, "The amount must be positive.");
+	    }
+	    String txTimestampMsg = props.getProperty("txTimestampMsg");
+	    if(e.getMessage().contains(txTimestampMsg)) {
+		throw new DeboException(400, "Unrecognizable date format. Use ISO 8601.");
+	    }
+	    throw new DeboException(500, "A database error occurred.");
+	}
 	if(rowsUpdated == 0) {
-	    throw new Exception("Transaction id not found.");
+	    throw new DeboException(404, "The requested transaction doesn't exist.");
 	}
     }
 
     /**
      * Deletes a currency
      */
-    public void deleteCurrency(String code, int userId) throws Exception, SQLException {
+    public void deleteCurrency(String code, int userId) throws DeboException {
+	int rowsDeleted = 0;
 	String query = "DELETE FROM currencies WHERE user_id = ? AND code = ?";
-	PreparedStatement st = conn.prepareStatement(query);
-	st.setInt(1, userId);
-	st.setString(2, code);
-	int rowsDeleted = st.executeUpdate();
-	st.close();
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setString(2, code);
+	    rowsDeleted = st.executeUpdate();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    String foreignCnst = props.getProperty("foreignCnst");
+	    if(e.getMessage().contains(foreignCnst)) {
+		throw new DeboException(400, "There are transactions using this currency. Please "
+					+ "remove them and try again.");
+	    }
+	    throw new DeboException(500, "A database error occurred.");
+	}
 	if(rowsDeleted == 0) {
-	    throw new Exception("Currency code not found.");
+	    throw new DeboException(400, "The requested currency doesn't exist.");
 	}
     }
 
     /**
      * Deletes an account
      */
-    public void deleteAccount(String name, int userId) throws Exception, SQLException {
+    public void deleteAccount(String name, int userId) throws DeboException {
+	int rowsDeleted = 0;
 	String query = "DELETE FROM accounts WHERE user_id = ? AND name = ?";
-	PreparedStatement st = conn.prepareStatement(query);
-	st.setInt(1, userId);
-	st.setString(2, name);
-	int rowsDeleted = st.executeUpdate();
-	st.close();
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setString(2, name);
+	    rowsDeleted = st.executeUpdate();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    String foreignCnst = props.getProperty("foreignCnst");
+	    if(e.getMessage().contains(foreignCnst)) {
+		throw new DeboException(400, "There are transactions using this account. Please "
+					+ "remove them and try again.");
+	    }
+	    throw new DeboException(500, "A database error occurred.");
+	}
 	if(rowsDeleted == 0) {
-	    throw new Exception("Account name not found.");
+	    throw new DeboException(400, "The requested account doesn't exist.");
 	}
     }
 
     /**
      * Deletes a transaction
      */
-    public void deleteTransaction(int id, int userId) throws Exception, SQLException {
+    public void deleteTransaction(int id, int userId) throws DeboException {
+	int rowsDeleted = 0;
 	String query = "DELETE FROM transactions WHERE user_id = ? AND id = ?";
-	PreparedStatement st = conn.prepareStatement(query);
-	st.setInt(1, userId);
-	st.setInt(2, id);
-	int rowsDeleted = st.executeUpdate();
-	st.close();
+	try {
+	    PreparedStatement st = conn.prepareStatement(query);
+	    st.setInt(1, userId);
+	    st.setInt(2, id);
+	    rowsDeleted = st.executeUpdate();
+	    st.close();
+	}
+	catch(SQLException e) {
+	    throw new DeboException(500, "A database error occurred.");
+	}
 	if(rowsDeleted == 0) {
-	    throw new Exception("Transaction id not found.");
+	    throw new DeboException(400, "The requested transaction doesn't exist.");
 	}
     }
 
@@ -916,7 +1021,8 @@ public class Model {
 	public String commentHas;
 	TxFilter() {}
 	public String toString() {
-	    return "\"" + commentHas + "\" (" + debit + ":" + credit + ") " + currency + " $" + minAmount + " - " + maxAmount + "$ <" + minDate + " - " + maxDate + ">";
+	    return "\"" + commentHas + "\" (" + debit + ":" + credit + ") " + currency + " $"
+		+ minAmount + " - " + maxAmount + "$ <" + minDate + " - " + maxDate + ">";
 	}
     }
 
@@ -930,7 +1036,8 @@ public class Model {
 	public String comment;
 	Transaction() {}
 	public String toString() {
-	    return id + ": " + debit + " < $" + String.valueOf(amount) + " " + currency + " > " + credit + " @ " + date + " | " + comment;
+	    return id + ": " + debit + " < $" + String.valueOf(amount) + " " + currency + " > "
+		+ credit + " @ " + date + " | " + comment;
 	}
     }
 }

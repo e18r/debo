@@ -7,34 +7,51 @@ import org.rapidoid.http.Req;
 import org.rapidoid.http.Resp;
 import java.util.ArrayList;
 import java.time.Instant;
+import java.util.HashMap;
+import org.rapidoid.setup.My;
 
 public class Controller {
 
     private static Logic logic;
 
-    private static int authenticate(Req req) throws Exception {
-	String authHeader = req.header("Authorization");
+    private static int authenticate(Req req) throws DeboException {
+	String authHeader;
+	try {
+	    authHeader = req.header("Authorization");
+	}
+	catch(IllegalArgumentException e) {
+	    throw new DeboException(401, "No Authorization header present.");
+	}
 	int userId = logic.authenticate(authHeader);
 	return userId;
     }
 
-    private static Resp handleException(Exception e, Req req) {
-	return req.response().result(U.map("code", 400, "error", e.getMessage(), "status", "Bad Request")).code(400);
+    private static Resp showError(DeboException e, Req req) {
+	return req.response().json(e.toMap()).code(e.code);
     }
     
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
+	try {
+	    logic = new Logic();
+	}
+	catch(Exception e) {
+	    System.err.println(e.toString());
+	    return;
+	}
 	App.bootstrap(args);
-	logic = new Logic();
+
+	My.errorHandler((req, resp, error) -> {
+		return showError(new DeboException(400), req);
+	    });
 
 	On.req(req -> {
 		try {
 		    authenticate(req);
+		    throw new DeboException(404, "The requested URL and method do not exist.");
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return null;
 	    });
 
 	On.get("/login").json((Req req) -> {
@@ -46,252 +63,188 @@ public class Controller {
 		try {
 		    String accessToken = logic.getAccessToken(code);
 		    String email = logic.getEmail(accessToken);
-		    ArrayList<Object> session = logic.getSession(email);
-		    String sessionToken = (String) session.get(0);
-		    Instant tokenExpires = (Instant) session.get(1);
-		    return req.response().result(U.map("session_token", sessionToken, "token_expires", tokenExpires.toString()));
+		    HashMap<String, String> session = logic.getSession(email);
+		    return req.response().json(session);
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 
 	On.get("/logout").json((Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
+		    int userId = authenticate(req);
+		    logic.logout(userId);
+		    return req.response().json("");
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		logic.logout(userId);
-		return "";
 	    });
 
 	On.get("/currency_types").json((Req req) -> {
 		try {
 		    authenticate(req);
+		    return U.list(logic.getCurrencyTypes());
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return U.list(logic.getCurrencyTypes());
 	    });
 
  	On.get("/account_types").json((Req req) -> {
 		try {
 		    authenticate(req);
+		    return U.list(logic.getAccountTypes());
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return U.list(logic.getAccountTypes());
 	    });
 
 	On.post("/currencies").json((Model.Currency c, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    Model.Currency newCurrency = logic.postCurrencies(c, userId);
 		    return req.response().result(newCurrency).code(201);
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	On.post("/accounts").json((Model.Account a, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    Model.Account newAccount = logic.postAccounts(a, userId);
 		    return req.response().result(newAccount).code(201);
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	On.post("/transactions").json((Model.Transaction t, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    Model.Transaction newTx = logic.postTransactions(t, userId);
 		    return req.response().result(newTx).code(201);
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	
 	On.get("/currencies").json((Model.Currency c, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
+		    int userId = authenticate(req);
+		    return U.list(logic.getCurrencies(c, userId));
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return U.list(logic.getCurrencies(c, userId));
 	    });
 	On.get("/accounts").json((Model.Account a, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
+		    int userId = authenticate(req);
+		    return U.list(logic.getAccounts(a, userId));
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return U.list(logic.getAccounts(a, userId));
 	    });
 	On.get("/transactions").json((Model.TxFilter t, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
+		    int userId = authenticate(req);
+		    return U.list(logic.getTransactions(t, userId));
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return U.list(logic.getTransactions(t, userId));
 	    });
 	
 	On.get("/currency/{code}").json((String code, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
+		    int userId = authenticate(req);
+		    return logic.getCurrency(code, userId);
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return logic.getCurrency(code, userId);
 	    });
 	On.get("/account/{name}").json((String name, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
+		    int userId = authenticate(req);
+		    return logic.getAccount(name, userId);
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return logic.getAccount(name, userId);
 	    });
 	On.get("/transaction/{id}").json((String id, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
+		    int userId = authenticate(req);
+		    return logic.getTransaction(id, userId);
 		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
-		return logic.getTransaction(id, userId);
 	    });
 	
 	On.patch("/currency/{oldCode}").json((String oldCode, Model.Currency c, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    return logic.patchCurrency(oldCode, c, userId);
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	On.patch("/account/{oldName}").json((String oldName, Model.Account a, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    return logic.patchAccount(oldName, a, userId);
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
-
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	On.patch("/transaction/{refId}").json((String refId, Model.Transaction t, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    return logic.patchTransaction(refId, t, userId);
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	
 	On.delete("/currency/{code}").json((String code, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    logic.deleteCurrency(code, userId);
-		    return "";
+		    return req.response().json("");
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	On.delete("/account/{name}").json((String name, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    logic.deleteAccount(name, userId);
-		    return "";
+		    return req.response().json("");
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
 	On.delete("/transaction/{id}").json((String id, Req req) -> {
-		int userId;
 		try {
-		    userId = authenticate(req);
-		}
-		catch(Exception e) {
-		    return req.response().result("").code(401);
-		}
-		try {
+		    int userId = authenticate(req);
 		    logic.deleteTransaction(id, userId);
-		    return "";
+		    return req.response().json("");
 		}
-		catch(Exception e) {
-		    return handleException(e, req);
+		catch(DeboException e) {
+		    return showError(e, req);
 		}
 	    });
     }
