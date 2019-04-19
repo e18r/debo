@@ -4,10 +4,10 @@
 # Copy this file to auth.properties and make the necessary changes
 #
 
-# Google Project ID (https://console.developers.google.com/)
+# Google Client ID (https://console.developers.google.com/)
 clientId=920924587623-n2s5sc25joh4ffm058fv90l60oel88j5.apps.googleusercontent.com
 
-# Google Project password
+# Google Client Secret
 clientSecret=0LbTuEGKYKyHLwTaE6JZqTxM
 
 # Redirect URI. It's the project's URI + "/redirect"
