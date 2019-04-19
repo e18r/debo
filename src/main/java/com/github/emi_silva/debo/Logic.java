@@ -14,6 +14,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.math.BigDecimal;
 
 public class Logic {
 
@@ -329,5 +330,10 @@ public class Logic {
 	    throw new DeboException(400, "Transaction IDs must be positive.");
 	}
 	model.deleteTransaction(id, userId);
+    }
+
+    public HashMap<Model.Account, BigDecimal> getBalance(String accountName, int userId)
+	throws DeboException {
+	return model.getBalance(accountName, userId);
     }
 }

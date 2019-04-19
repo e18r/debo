@@ -970,6 +970,33 @@ public class Model {
 	}
     }
 
+    /**
+     * Returns an account's balance
+     */
+    public HashMap<Account, BigDecimal> getBalance(String accountName, int userId)
+	throws DeboException {
+	HashMap<Account, BigDecimal> result = new HashMap<Account, BigDecimal>();
+	Account account = getAccount(accountName, userId);
+	BigDecimal balance = new BigDecimal(0);
+	TxFilter filter = new TxFilter();
+	filter.account = accountName;
+	ArrayList<Transaction> txs = getTransactions(filter, userId);
+	for(Transaction tx : txs) {
+	    if((tx.debit.equals(accountName)
+		&& (account.type.equals("asset") || account.type.equals("expense")))
+	       || (tx.credit.equals(accountName)
+		   && (account.type.equals("liability") || account.type.equals("income")
+		       || account.type.equals("equity")))) {
+		balance = balance.add(tx.amount);
+	    }
+	    else {
+		balance = balance.subtract(tx.amount);
+	    }
+	}
+	result.put(account, balance);
+	return result;
+    }
+
     public static class CurrencyType {
 	public int id;
 	public String name;
