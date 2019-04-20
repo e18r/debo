@@ -971,6 +971,22 @@ public class Model {
     }
 
     /**
+     * Returns an account's normal balance (debit or credit)
+     */
+    public String getNB(Account account) throws DeboException {
+	if(account.type.equals("asset") || account.type.equals("expense")) {
+	    return "debit";
+	}
+	else if(account.type.equals("liability") || account.type.equals("equity")
+		|| account.type.equals("income")) {
+	    return "credit";
+	}
+	else {
+	    throw new DeboException(500, "Invalid account type");
+	}
+    }
+
+    /**
      * Returns an account's balance
      */
     public HashMap<Account, BigDecimal> getBalance(String accountName, int userId)
@@ -982,11 +998,8 @@ public class Model {
 	filter.account = accountName;
 	ArrayList<Transaction> txs = getTransactions(filter, userId);
 	for(Transaction tx : txs) {
-	    if((tx.debit.equals(accountName)
-		&& (account.type.equals("asset") || account.type.equals("expense")))
-	       || (tx.credit.equals(accountName)
-		   && (account.type.equals("liability") || account.type.equals("income")
-		       || account.type.equals("equity")))) {
+	    if((tx.debit.equals(accountName) && getNB(account).equals("debit"))
+	       || (tx.credit.equals(accountName) && getNB(account).equals("credit"))) {
 		balance = balance.add(tx.amount);
 	    }
 	    else {
