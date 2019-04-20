@@ -1010,6 +1010,20 @@ public class Model {
 	return result;
     }
 
+    /**
+     * Returns all accounts' balances
+     */
+    public HashMap<Account, BigDecimal> getBalances(int userId)
+	throws DeboException {
+	HashMap<Account, BigDecimal> balances = new HashMap<Account, BigDecimal>();
+	ArrayList<Account> accounts = getAccounts(new Account(), userId);
+	for(Account account : accounts) {
+	    HashMap<Account, BigDecimal> balance = getBalance(account.name, userId);
+	    balances.putAll(balance);
+	}
+	return balances;
+    }
+
     public static class CurrencyType {
 	public int id;
 	public String name;

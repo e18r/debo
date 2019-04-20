@@ -336,4 +336,9 @@ public class Logic {
 	throws DeboException {
 	return model.getBalance(accountName, userId);
     }
+
+    public HashMap<Model.Account, BigDecimal> getBalances(int userId)
+	throws DeboException {
+	return model.getBalances(userId);
+    }
 }

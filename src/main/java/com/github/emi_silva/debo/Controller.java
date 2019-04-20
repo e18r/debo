@@ -256,5 +256,14 @@ public class Controller {
 		    return showError(e, req);
 		}
 	    });
+	On.get("/balances").json((Req req) -> {
+		try {
+		    int userId = authenticate(req);
+		    return logic.getBalances(userId);
+		}
+		catch(DeboException e) {
+		    return showError(e, req);
+		}
+	    });
     }
 }
