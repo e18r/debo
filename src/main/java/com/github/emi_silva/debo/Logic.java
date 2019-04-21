@@ -332,13 +332,63 @@ public class Logic {
 	model.deleteTransaction(id, userId);
     }
 
-    public HashMap<Model.Account, BigDecimal> getBalance(String accountName, int userId)
-	throws DeboException {
-	return model.getBalance(accountName, userId);
+    /**
+     * Returns an account's normal balance (debit or credit)
+     */
+    public String getNB(Model.Account account) throws DeboException {
+	if(account.type.equals("asset") || account.type.equals("expense")) {
+	    return "debit";
+	}
+	else if(account.type.equals("liability") || account.type.equals("equity")
+		|| account.type.equals("income")) {
+	    return "credit";
+	}
+	else {
+	    throw new DeboException(500, "Invalid account type");
+	}
     }
 
-    public HashMap<Model.Account, BigDecimal> getBalances(int userId)
+    /**
+     * Returns an account's balance
+     */
+    public HashMap<String, BigDecimal> getBalance(String accountName, int userId)
 	throws DeboException {
-	return model.getBalances(userId);
+	Model.Account account = model.getAccount(accountName, userId);
+	HashMap<String, BigDecimal> balance = new HashMap<String, BigDecimal>();
+	Model.TxFilter filter = new Model.TxFilter();
+	filter.account = accountName;
+	ArrayList<Model.Transaction> txs = model.getTransactions(filter, userId);
+	for(Model.Transaction tx : txs) {
+	    if(!balance.containsKey(tx.currency)) {
+		balance.put(tx.currency, new BigDecimal(0));
+	    }
+	    BigDecimal currentBalance = balance.get(tx.currency);
+	    if((tx.debit.equals(accountName) && getNB(account).equals("debit"))
+	       || (tx.credit.equals(accountName) && getNB(account).equals("credit"))) {
+		balance.put(tx.currency, currentBalance.add(tx.amount));
+	    }
+	    else {
+		balance.put(tx.currency, currentBalance.subtract(tx.amount));
+	    }
+	}
+	return balance;
+    }
+
+    /**
+     * Returns all accounts' balances
+     */
+    public HashMap<String, HashMap<String, HashMap<String, BigDecimal>>> getBalances(int userId)
+	throws DeboException {
+	HashMap<String, HashMap<String, HashMap<String, BigDecimal>>> types = new HashMap<String, HashMap<String, HashMap<String, BigDecimal>>>();
+	ArrayList<Model.Account> accounts = model.getAccounts(new Model.Account(), userId);
+	for(Model.Account account : accounts) {
+	    if(!types.containsKey(account.type)) {
+		types.put(account.type, new HashMap<String, HashMap<String, BigDecimal>>());
+	    }
+	    HashMap<String, HashMap<String, BigDecimal>> type = types.get(account.type);
+	    HashMap<String, BigDecimal> balance = getBalance(account.name, userId);
+	    type.put(account.name, balance);
+	}
+	return types;
     }
 }

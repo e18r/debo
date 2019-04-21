@@ -970,60 +970,6 @@ public class Model {
 	}
     }
 
-    /**
-     * Returns an account's normal balance (debit or credit)
-     */
-    public String getNB(Account account) throws DeboException {
-	if(account.type.equals("asset") || account.type.equals("expense")) {
-	    return "debit";
-	}
-	else if(account.type.equals("liability") || account.type.equals("equity")
-		|| account.type.equals("income")) {
-	    return "credit";
-	}
-	else {
-	    throw new DeboException(500, "Invalid account type");
-	}
-    }
-
-    /**
-     * Returns an account's balance
-     */
-    public HashMap<Account, BigDecimal> getBalance(String accountName, int userId)
-	throws DeboException {
-	HashMap<Account, BigDecimal> result = new HashMap<Account, BigDecimal>();
-	Account account = getAccount(accountName, userId);
-	BigDecimal balance = new BigDecimal(0);
-	TxFilter filter = new TxFilter();
-	filter.account = accountName;
-	ArrayList<Transaction> txs = getTransactions(filter, userId);
-	for(Transaction tx : txs) {
-	    if((tx.debit.equals(accountName) && getNB(account).equals("debit"))
-	       || (tx.credit.equals(accountName) && getNB(account).equals("credit"))) {
-		balance = balance.add(tx.amount);
-	    }
-	    else {
-		balance = balance.subtract(tx.amount);
-	    }
-	}
-	result.put(account, balance);
-	return result;
-    }
-
-    /**
-     * Returns all accounts' balances
-     */
-    public HashMap<Account, BigDecimal> getBalances(int userId)
-	throws DeboException {
-	HashMap<Account, BigDecimal> balances = new HashMap<Account, BigDecimal>();
-	ArrayList<Account> accounts = getAccounts(new Account(), userId);
-	for(Account account : accounts) {
-	    HashMap<Account, BigDecimal> balance = getBalance(account.name, userId);
-	    balances.putAll(balance);
-	}
-	return balances;
-    }
-
     public static class CurrencyType {
 	public int id;
 	public String name;
